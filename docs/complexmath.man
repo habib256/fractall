@@ -1,0 +1,231 @@
+COMPLEX FUNCTION  "Date 27/Oct/1994"
+NAME
+
+MakeComplex, SetofComplex, ZeroSetofComplex, ESetofComplex, ISetofComplex, 
+InfSetocComplex, NaNSetofComplex,ScalarTimesofComplex, Rez, Imz,
+Negz, Addz, Subz, Mulz, Divz, Magz, Mag2z, Argz, Sqrtz, Powz, powzn,
+sinz, cosz, tanz, expz, sinhz, coshz, tanhz, 
+Logz, Arcsinz, Arccosz, Arctanz, Arcsinhz, Arccoshz, and Arctanhz
+
+SYNOPSIS
+
+#include "complexmath.h"
+
+void MakeComplex(real, imag, rz)
+double real, imag;
+COMPLEX *rz;
+
+void SetofComplex(z, rz)
+COMPLEX z, *rz;
+
+void ZeroSetofComplex(rz)
+COMPLEX *rz;
+
+void ESetofComplex(rz)
+COMPLEX *rz;
+
+void ISetofComplex(rz);
+COMPLEX *rz;
+
+void InfSetofComplex(rz);
+COMPLEX *rz;
+
+void NaNSetofComplex(rz);
+COMPLEX *rz;
+
+void ScalarTimesofComplex(c, z, rz)
+doulex c
+COMPLEX z, *rz
+
+double Rez( z)
+COMPLEX z
+
+double Imz( z)
+COMPLEX z
+
+void Negz(z, rz)
+COMPLEX z, *rz
+
+void Addz(z1, z2, rz)
+COMPLEX z1,z2,*rz
+
+void Subz(z1, z2, rz)
+COMPLEX z1, z2, *rz
+
+void Mulz(z1, z2, rz)
+COMPLEX z1, z2, *rz
+
+int Divz(z1, z2, rz)
+COMPLEX z1, z1, *rz
+
+double Mag(z)
+COMPLEX z
+
+double Magz2(z)
+COMPLEX z
+
+double Argz(z)
+COMPLEX z
+
+void Sqrtz(z, rz)
+COMPLEX z, *rz
+
+int Powz(z1, z2, rz)
+COMPLEX z1, z2, *rz
+
+int powzn(z1, z2, n, rz)
+COMPLEX z1, z2, *rz
+int n 
+
+void sinz(z, rz)
+COMPLEX z, *rz
+
+void cosz(z, rz)
+COMPLEX z, *rz
+
+int tanz(z, rz)
+COMPLEX z, *rz
+
+void expz(z, rz)
+COMPLEX z, *rz
+
+void sinhz(z, rz)
+COMPLEX z, *rz
+
+void coshz(z, rz)
+COMPLEX z, *rz
+
+int tanhz(z, rz)
+COMPLEX z, *rz
+
+int Logz(z, rz)
+COMPLEX z, *rz
+
+int Arcsinz(z, rz)
+COMPLEX z, *rz
+
+int Arccosz(z, rz)
+COMPLEX z, *rz
+
+int Arctanz(z, rz)
+COMPLEX z, *rz
+
+int Arcsinhz(z, rz)
+COMPLEX z, *rz
+
+int Arccoshz(z, rz)
+COMPLEX z, *rz
+
+int Arctanhz(z, rz)
+COMPLEX z, *rz
+
+
+DESCRIPTION
+
+Some these functions calculate complex functions for complex numbers.
+They are Negz(), Addz(), Subz(), Mulz(), Divz(), Sqrtz(), Powz(), powzn(), 
+sinz(), cosz(), tanz(), expz(), sinhz(), coshz(), tanh(), 
+Logz(), Arcsinz(), Arccosz(), Arctanz(), Arcsinhz(), Arccoshz() and Arctanhz().
+
+MakeComplex(real,imag,*rz) sets {real} + i * {imag} to *rz.
+
+SetofComplex(z,*rz) puts z to *rz.
+
+ZeroSetofComplex(*rz) and ESetofComplex(*rz), ISetofComplex(*rz) returns 0, 1,
+,i to *rz, respectively.
+
+InfSetofComplex(*rz) sets infinity to *rz.
+
+NaNSetofComplex(*rz) sets NaN + NaN i to *rz.  
+
+ScalarTimesofComplex(c,z,*rz) returns c is a real number muliplied by z is a 
+complex number to *rz.
+
+Rez(z), Imz(z) retuens the real, imagnary number of z, respectively.
+
+Negz(z,*rz) returns negative z to *rz.
+
+
+Addz(), Subz(), Mulz(), and Divz() are arithmetical operations of 
+complex numbers.
+ 
+Addz(z1,z2,*rz) returns addition z1 is a complex number plus z2 is a complex 
+number to *rz is a complex number.
+
+Subz(z1,z2,*rz) returns z1 is a complex number minus z2 is a complex number to
+*rz is a complex number.
+
+Mulz(z1,z2,*rz) returns z1 is a complex number multiplied z2 is a complex 
+number to *rz is a complex number. Mulz() returns NaN + NaN i to *rz if
+z1 = zero and z2 = Infinity, or z1 = Infinity and z1 = zero. 
+
+Divz(z1,z2,*rz) returns z1 is a complex number divided z2 a complex number of
+complex numbers to *rz. Divz() returns 0 to *rz if z1 isn't zero or Infinity,
+z2 = Infinity. Divz() returns Infinity to *rz if z1 isn't zero or Infinity,
+z2 = zero. If 0/0, Infinity/0, 0/Infinity and Infinity/Infinity, Divz() 
+returns NaN + NaN i to *rz.  
+
+
+Sqrtz(z,*rz) returns plus value of the squre root of z to *rz;
+
+Powz(z1,z2,*rz) returns main value of the z2'th power of z1 to *rz.
+
+powzn(z1,z2,n,*rz) returns n'th value of the z2'th power of z1 to *rz.
+
+sinz(z,*rz), cosz(z,*rz) and tanz(z,*rz) return the trigonometric 
+functions for complex numbers, z to *rz.
+
+expz(z,*rz) returns the exponential function of complex to *rz.
+
+sinhz(z,*rz), coshz(z, rz) and tanhz(z, rz) return the hyperbolic 
+functions for complex numbers, z to *rz.
+
+Logz(z,*rz) returns the prime of the natural logarithm of a complex 
+number, z to *rz.  
+
+Arcsinz(z, rz), Arccosz(z, rz) and Arctanz(z, rz) return a main value of the 
+inverse of the trigonometric function for complex numbers, z to *rz.
+
+Arcsinhz(z, rz), Arccoshz(z, rz) and Arctanhz(z, rz) return a main value of 
+the inverse of a hyperbolic function for complex numbers, z to *rz.
+
+Others compute any value for a complex number.
+They are Magz(), Magz2() and Argz().
+
+Magz(z) returns the distance from the origin to z in the complex plane.
+
+Magz2(z) returns the square of the distance from the origin to z. 
+
+Argz(z) returns the argument of z from the x-axis. And -PI <= Argz(z) <= PI. 
+
+
+RETURN VALUE
+
+Divz(z1,z2, rz) sets NaN to rz and returns '0' as a error code for 0/0, 
+0/Inf, Inf/0 and Inf/Inf. 
+Else, Divz(z1, z2, rz) return '1' as a correct code.
+
+Powz(z, rz) and powzn sets NaN to rz and returns '0' as a error code if 
+z1.x = 0.0, z1.y = 0.0, z2.x = 0.0 and z2.y = 0.0.
+
+Powz() and powzn sets NaN to rz and returns '0' as a error code if 0^(a+ib)
+
+Excepting above cases, Powz() and powzn() return '1' as a correct code.
+As pow(), if z1 isn't zero and z2 is zero, then rz is 1.0 for all z1 .
+
+tanz(z, rz) sets NaN to rz and returns '0' as a error code if sinz/cosz 
+returns a error code.
+
+tanhz(z, rz) sets NaN to rz and returns '0' as a error code if sinhz()/coshz() 
+returns a error code.
+
+Logz(z, rz) sets NaN to rz and return '0' as a error code if z = zero.
+
+Arcsinz(z, rz), Arccosz(z, rz), Arctan(z, rz), Arcsinh(z, rz), Arcosh(z, rz)
+Arctanh(z, rz) set NaN to rz and return '0' as a error code if Logz(z, rz) 
+returns a error code.
+
+Excepting above cases, All of inverse function return '1' as a correct code.
+
+
+AUTHOR  Akihiro Sato (aki@dais.is.tohoku.ac.jp)

@@ -1,0 +1,26 @@
+2014/11/11 - Updated Autotools 
+2003/09/04 - New Fractal types & gui usability
+2003/08/28 - Added SDL_gfx Library
+	     Remove SFont, SDLTK, SDL_framerate
+2003/08/27 - Added automatic mouse iteration on VonKoch
+	     Added typeFractal selection (use F1,F2,F3)
+2003/08/21 - Added VonKoch and Dragon Function
+2003/08/19 - Fix a lot of warnings under VC6
+	     Update GNU automake to version 1.7
+2003/08/12 - FractAll v 0.0.2 work on win32 !!
+2002/08/12 - Miscellaneous bugs fixes
+2002/06/25 - Take a screenshot while pressing the s key,
+	     integration of the SFONT library and gui fixes.
+2002/06/19 - Basic Command line Interpreter Implemented
+	     You can quit FractAll by pressing ESC or Q
+2002/06/18 - FractAll v 0.0.1 with miscellaneous fixes in src code.
+	     Unzoom on second mouse button is implemented.
+2002/01/31 - Starting the GUI implementation
+2002/01/25 - FractAll v 0.0.0 : The color mode was implemented with
+	     A portable colorMatrix and a weird test color mode.
+2002/01/20 - Rewrite the Fractal Matrix Calculation code for a two pass viewer
+	     Add matrix value of complex z for the last iteration
+	     Big rewrite of complexmath for exception handling.
+2002/01/09 - Fractal Matrix Calculation Optimized by 40% !
+2002/01/09 - Show the Maldelbrot Set with active zoom.
+2001/12/20 - Nothing is done. So, let's code :-)

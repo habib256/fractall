@@ -1,0 +1,7 @@
+Many things, this is the first public release
+
+- Functionnal GUI
+- Re-use of the previous cmatrix when zooming for big speedup !
+- Others formulas
+- Color palette with smoth curb (bezier)
+

@@ -1,0 +1,4 @@
+Akihiro Sato at Tohoku University, Department of Technology, in Japan has sent
+some complex math routines in c language. He can be contacted by email at the
+address aki@dais.is.tohoku.ac.jp. The files complexmath.c, complexmath.h 
+and complexmath.man contain all the relavent material. 
