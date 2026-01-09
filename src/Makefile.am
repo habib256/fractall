@@ -32,6 +32,14 @@ fractall_SOURCES = \
 	VonKoch.c \
 	VonKoch.h
 
+if HAVE_GMP
+fractall_SOURCES += \
+	complexmath_gmp.c \
+	complexmath_gmp.h \
+	precision_detector.c \
+	precision_detector.h
+endif
+
 fractall_LDFLAGS =  -lm
 
 fractall_LDADD =  \

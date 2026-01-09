@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "SDLGUI.h"
 #include "VonKoch.h"
 #include "EscapeTime.h"
@@ -109,7 +110,7 @@ void SDLGUI_Button_Draw (SDL_Surface* screen, gui* g, int xplace) {
   {
   	fractal f;
 	f = Fractal_Init (g->buttonSize-4, g->buttonSize-4,SDLGUI_ButtonNumberRead (g, xplace)+1);
-	Fractal_Draw (screen, f,xplace+2, 4);
+	Fractal_Draw (screen, f, xplace+2, 4, NULL);  // NULL = pas de progression pour le bouton
 	Fractal_Destroy (f);
 	}
 	break;
@@ -167,17 +168,19 @@ void SDLGUI_Draw3DBox (SDL_Surface *surface, int x, int y, int w, int h, Uint32 
   SDL_FillRect(surface, &dstrect, color);
 }
 
-void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMode, double centerX, double centerY, int zoomFactor, Uint32 renderTime) {
+void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMode, double centerX, double centerY, int zoomFactor, Uint32 renderTime, fractal* f) {
 	const char* typeNames[] = {"", "Von Koch", "Dragon", "Mandelbrot", "Julia", "Julia Sin",
 		"Newton", "Phoenix", "Sierpinski", "Barnsley J", "Barnsley M",
 		"Magnet J", "Magnet M", "Burning Ship", "Tricorn", "Mandelbulb", "Buddhabrot"};
 	const char* paletteNames[] = {"Normal", "Mono", "Fire", "Ocean", "Rainbow", "SmoothFire", "SmoothOcean"};
 	char statusText[256];
+	char precisionText[64];
+	int precisionX;
 
 	// Redessiner la barre d'état
 	SDLGUI_StateBar_Draw(screen, g);
 
-	// Formater le texte
+	// Formater le texte principal (gauche)
 	if (type >= 1 && type <= 16) {
 		snprintf(statusText, sizeof(statusText), "%s | %s | x%d | (%.3f, %.3f) | %dms",
 			typeNames[type], paletteNames[colorMode], zoomFactor, centerX, centerY, renderTime);
@@ -185,8 +188,26 @@ void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMod
 		snprintf(statusText, sizeof(statusText), "Type %d | %s", type, paletteNames[colorMode]);
 	}
 
-	// Afficher le texte
+	// Afficher le texte principal à gauche
 	stringRGBA(screen, 5, g->stateH + 5, statusText, 0, 0, 0, 255);
+
+	// Formater et afficher la précision en bas à droite
+	if (f != NULL) {
+#ifdef HAVE_GMP
+		if (f->use_gmp) {
+			snprintf(precisionText, sizeof(precisionText), "GMP %lu bits", (unsigned long)f->gmp_precision);
+		} else {
+			snprintf(precisionText, sizeof(precisionText), "double");
+		}
+#else
+		snprintf(precisionText, sizeof(precisionText), "double");
+#endif
+		// Calculer la position X pour aligner à droite (approximatif, chaque caractère fait ~6 pixels)
+		// Un peu moins à droite : on ajoute 20 pixels de marge
+		precisionX = g->w - strlen(precisionText) * 6 - 25;
+		if (precisionX < 5) precisionX = 5; // Éviter le débordement à gauche
+		stringRGBA(screen, precisionX, g->stateH + 5, precisionText, 0, 0, 0, 255);
+	}
 
 	SDL_UpdateRect(screen, 0, g->stateH, g->w, screen->h - g->stateH);
 }

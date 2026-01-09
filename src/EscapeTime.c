@@ -11,6 +11,9 @@ Copyleft 2001-2003 VERHILLE Arnaud
 #include "SDL_gfxPrimitives.h"
 #include "EscapeTime.h"
 #include "SDLGUI.h"   // Pour la barre de progression
+#ifdef HAVE_GMP
+#include "precision_detector.h"
+#endif
 
 // Fractal Functions
 // *****************
@@ -23,6 +26,11 @@ fractal Fractal_Init (int screenW, int screenH, int type) {
 	f.ypixel = screenH;
 	f.type = type;
 	f.colorMode = 0;
+#ifdef HAVE_GMP
+	f.use_gmp = 0;
+	f.gmp_precision = 64;
+	f.zmatrix_gmp = NULL;
+#endif
 	Fractal_ChangeType (&f, type);
 	f.fmatrix = (int *) malloc ((f.xpixel*f.ypixel)* sizeof (int));
 	f.zmatrix = (complex *) malloc ((f.xpixel*f.ypixel)* sizeof (complex));
@@ -31,6 +39,37 @@ fractal Fractal_Init (int screenW, int screenH, int type) {
 		fprintf(stderr, "Erreur allocation mémoire fractale\n");
 		exit(1);
 	}
+#ifdef HAVE_GMP
+	precision_update_fractal(&f);
+	if (f.use_gmp) {
+		// Initialiser les coordonnées GMP
+		mpf_init2(f.xmin_gmp, f.gmp_precision);
+		mpf_init2(f.xmax_gmp, f.gmp_precision);
+		mpf_init2(f.ymin_gmp, f.gmp_precision);
+		mpf_init2(f.ymax_gmp, f.gmp_precision);
+		// Synchroniser depuis les double
+		mpf_set_d(f.xmin_gmp, f.xmin);
+		mpf_set_d(f.xmax_gmp, f.xmax);
+		mpf_set_d(f.ymin_gmp, f.ymin);
+		mpf_set_d(f.ymax_gmp, f.ymax);
+		
+		f.zmatrix_gmp = (complex_gmp *) malloc ((f.xpixel*f.ypixel)* sizeof (complex_gmp));
+		if (f.zmatrix_gmp == NULL) {
+			fprintf(stderr, "Erreur allocation mémoire GMP fractale\n");
+			exit(1);
+		}
+		// Initialiser tous les éléments GMP
+		for (int i = 0; i < f.xpixel * f.ypixel; i++) {
+			complex_gmp_init(&f.zmatrix_gmp[i], f.gmp_precision);
+		}
+	} else {
+		// Initialiser quand même pour éviter les problèmes (mais non utilisés)
+		mpf_init2(f.xmin_gmp, 64);
+		mpf_init2(f.xmax_gmp, 64);
+		mpf_init2(f.ymin_gmp, 64);
+		mpf_init2(f.ymax_gmp, 64);
+	}
+#endif
 	return f;
 }
 
@@ -38,7 +77,41 @@ void Fractal_Destroy (fractal f) {
 	free (f.fmatrix);
 	free (f.zmatrix);
 	free (f.cmatrix);
+#ifdef HAVE_GMP
+	if (f.zmatrix_gmp != NULL) {
+		for (int i = 0; i < f.xpixel * f.ypixel; i++) {
+			complex_gmp_clear(&f.zmatrix_gmp[i]);
+		}
+		free (f.zmatrix_gmp);
+	}
+	// Libérer les coordonnées GMP
+	mpf_clear(f.xmin_gmp);
+	mpf_clear(f.xmax_gmp);
+	mpf_clear(f.ymin_gmp);
+	mpf_clear(f.ymax_gmp);
+#endif
 }
+
+// Fonctions de synchronisation des coordonnées
+#ifdef HAVE_GMP
+static void fractal_sync_coords_double_to_gmp(fractal* f) {
+	if (f->use_gmp) {
+		mpf_set_d(f->xmin_gmp, f->xmin);
+		mpf_set_d(f->xmax_gmp, f->xmax);
+		mpf_set_d(f->ymin_gmp, f->ymin);
+		mpf_set_d(f->ymax_gmp, f->ymax);
+	}
+}
+
+static void fractal_sync_coords_gmp_to_double(fractal* f) {
+	if (f->use_gmp) {
+		f->xmin = mpf_get_d(f->xmin_gmp);
+		f->xmax = mpf_get_d(f->xmax_gmp);
+		f->ymin = mpf_get_d(f->ymin_gmp);
+		f->ymax = mpf_get_d(f->ymax_gmp);
+	}
+}
+#endif
 
 void Fractal_CalculateMatrix (fractal* f) {
 	int i, j;
@@ -46,6 +119,70 @@ void Fractal_CalculateMatrix (fractal* f) {
 	fractalresult result;
 
 	printf ("Calculating Full EscapeTimeFractal Matrix  ...\n");
+
+#ifdef HAVE_GMP
+	if (f->use_gmp) {
+		complex_gmp zPixel_gmp;
+		mpf_t xg, yg;
+		mp_bitcnt_t prec = f->gmp_precision;
+		
+		mpf_init2(xg, prec);
+		mpf_init2(yg, prec);
+		
+		for (i=0; i<f->xpixel; i++) {
+			for (j=0; j<f->ypixel; j++) {
+				// Calcul des coordonnées en GMP directement depuis les coordonnées GMP
+				mpf_t range_x, range_y, step_x, step_y, i_mpf, j_mpf;
+				mpf_init2(range_x, prec);
+				mpf_init2(range_y, prec);
+				mpf_init2(step_x, prec);
+				mpf_init2(step_y, prec);
+				mpf_init2(i_mpf, prec);
+				mpf_init2(j_mpf, prec);
+				
+				// Utiliser les coordonnées GMP directement
+				mpf_sub(range_x, f->xmax_gmp, f->xmin_gmp);
+				mpf_sub(range_y, f->ymax_gmp, f->ymin_gmp);
+				mpf_set_ui(i_mpf, i);
+				mpf_set_ui(j_mpf, j);
+				mpf_set_ui(step_x, f->xpixel);
+				mpf_set_ui(step_y, f->ypixel);
+				
+				// xg = (xmax-xmin)/xpixel * i + xmin
+				mpf_div(step_x, range_x, step_x);
+				mpf_mul(xg, step_x, i_mpf);
+				mpf_add(xg, xg, f->xmin_gmp);
+				
+				// yg = (ymax-ymin)/ypixel * j + ymin
+				mpf_div(step_y, range_y, step_y);
+				mpf_mul(yg, step_y, j_mpf);
+				mpf_add(yg, yg, f->ymin_gmp);
+				
+				zPixel_gmp = complex_gmp_make(xg, yg, prec);
+				result = FormulaSelector_GMP(*f, zPixel_gmp);
+				
+				*((f->fmatrix)+((f->xpixel*j)+i)) = result.iteration;
+				*((f->zmatrix)+((f->xpixel*j)+i)) = result.z;
+				if (f->zmatrix_gmp != NULL) {
+					complex_gmp_clear(&f->zmatrix_gmp[(f->xpixel*j)+i]);
+					f->zmatrix_gmp[(f->xpixel*j)+i] = complex_to_gmp(result.z, prec);
+				}
+				
+				complex_gmp_clear(&zPixel_gmp);
+				mpf_clear(range_x);
+				mpf_clear(range_y);
+				mpf_clear(step_x);
+				mpf_clear(step_y);
+				mpf_clear(i_mpf);
+				mpf_clear(j_mpf);
+			}
+		}
+		
+		mpf_clear(xg);
+		mpf_clear(yg);
+		return;
+	}
+#endif
 
 	for (i=0; i<f->xpixel; i++) {
 		for (j=0; j<f->ypixel; j++) {
@@ -61,16 +198,148 @@ void Fractal_CalculateMatrix (fractal* f) {
 	}
 }
 
-void Fractal_CalculateMatrix_DDp1 (fractal* f) {
+#ifdef HAVE_GMP
+static void Fractal_CalculateMatrix_DDp1_GMP (fractal* f, SDL_Surface* canvas, void* guiPtr, int* progress, int progressStart, int progressEnd, const char* fractalName) {
+	int i, j;
+	complex_gmp zPixel_gmp;
+	mpf_t xg, yg;
+	mp_bitcnt_t prec = f->gmp_precision;
+	fractalresult result;
+	int totalPixels, currentPixel = 0;
+	int lastPercent = -1;
+	int progressInterval;
+	
+	printf ("Calculating EscapeTimeFractal Matrix with DDp1 (GMP) ...\n");
+	
+	// Calculer le nombre total de pixels à traiter (grille 2x2)
+	totalPixels = ((f->xpixel + 1) / 2) * ((f->ypixel + 1) / 2);
+	progressInterval = totalPixels / 100;
+	if (progressInterval < 1) progressInterval = 1;
+	
+	mpf_init2(xg, prec);
+	mpf_init2(yg, prec);
+	
+	for (j=0; j<f->ypixel; j=j+2) {
+		for (i=0; i<f->xpixel; i=i+2) {
+			// Mise à jour de la progression
+			if (guiPtr != NULL && (currentPixel % progressInterval == 0)) {
+				int percent = progressStart + ((currentPixel * (progressEnd - progressStart)) / totalPixels);
+				if (percent != lastPercent && percent <= progressEnd) {
+					SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
+					*progress = percent;
+					lastPercent = percent;
+				}
+			}
+			currentPixel++;
+			// Calcul des coordonnées en GMP directement depuis les coordonnées GMP
+			mpf_t range_x, range_y, step_x, step_y, i_mpf, j_mpf;
+			mpf_init2(range_x, prec);
+			mpf_init2(range_y, prec);
+			mpf_init2(step_x, prec);
+			mpf_init2(step_y, prec);
+			mpf_init2(i_mpf, prec);
+			mpf_init2(j_mpf, prec);
+			
+			mpf_sub(range_x, f->xmax_gmp, f->xmin_gmp);
+			mpf_sub(range_y, f->ymax_gmp, f->ymin_gmp);
+			mpf_set_ui(i_mpf, i);
+			mpf_set_ui(j_mpf, j);
+			mpf_set_ui(step_x, f->xpixel);
+			mpf_set_ui(step_y, f->ypixel);
+			
+			mpf_div(step_x, range_x, step_x);
+			mpf_mul(xg, step_x, i_mpf);
+			mpf_add(xg, xg, f->xmin_gmp);
+			
+			mpf_div(step_y, range_y, step_y);
+			mpf_mul(yg, step_y, j_mpf);
+			mpf_add(yg, yg, f->ymin_gmp);
+			
+			zPixel_gmp = complex_gmp_make(xg, yg, prec);
+			result = FormulaSelector_GMP(*f, zPixel_gmp);
+			
+			*((f->fmatrix)+((f->xpixel*j)+i)) = result.iteration;
+			*((f->zmatrix)+((f->xpixel*j)+i)) = result.z;
+			if (f->zmatrix_gmp != NULL) {
+				complex_gmp_clear(&f->zmatrix_gmp[(f->xpixel*j)+i]);
+				f->zmatrix_gmp[(f->xpixel*j)+i] = complex_to_gmp(result.z, prec);
+			}
+			
+			// On complete pour un preview tout en evitant Segfault
+			if ((i+1) < f->xpixel) {
+				*((f->fmatrix)+((f->xpixel*j)+(i+1))) = result.iteration;
+				*((f->zmatrix)+((f->xpixel*j)+(i+1))) = result.z;
+				if (f->zmatrix_gmp != NULL) {
+					complex_gmp_clear(&f->zmatrix_gmp[(f->xpixel*j)+(i+1)]);
+					f->zmatrix_gmp[(f->xpixel*j)+(i+1)] = complex_to_gmp(result.z, prec);
+				}
+			}
+			if ((j+1) < f->ypixel) {
+				*((f->fmatrix)+((f->xpixel*(j+1))+i)) = result.iteration;
+				*((f->zmatrix)+((f->xpixel*(j+1))+i)) = result.z;
+				if (f->zmatrix_gmp != NULL) {
+					complex_gmp_clear(&f->zmatrix_gmp[(f->xpixel*(j+1))+i]);
+					f->zmatrix_gmp[(f->xpixel*(j+1))+i] = complex_to_gmp(result.z, prec);
+				}
+			}
+			if ( ((i+1) < f->xpixel) && ((j+1) < f->ypixel)) {
+				*((f->fmatrix)+((f->xpixel*(j+1))+(i+1))) = result.iteration;
+				*((f->zmatrix)+((f->xpixel*(j+1))+(i+1))) = result.z;
+				if (f->zmatrix_gmp != NULL) {
+					complex_gmp_clear(&f->zmatrix_gmp[(f->xpixel*(j+1))+(i+1)]);
+					f->zmatrix_gmp[(f->xpixel*(j+1))+(i+1)] = complex_to_gmp(result.z, prec);
+				}
+			}
+			
+			complex_gmp_clear(&zPixel_gmp);
+			mpf_clear(range_x);
+			mpf_clear(range_y);
+			mpf_clear(step_x);
+			mpf_clear(step_y);
+			mpf_clear(i_mpf);
+			mpf_clear(j_mpf);
+		}
+	}
+	
+	mpf_clear(xg);
+	mpf_clear(yg);
+}
+#endif
+
+void Fractal_CalculateMatrix_DDp1 (fractal* f, SDL_Surface* canvas, void* guiPtr, int* progress, int progressStart, int progressEnd, const char* fractalName) {
+#ifdef HAVE_GMP
+	if (f->use_gmp) {
+		Fractal_CalculateMatrix_DDp1_GMP(f, canvas, guiPtr, progress, progressStart, progressEnd, fractalName);
+		return;
+	}
+#endif
 	int i, j;
 	double xg, yg;
 	complex zPixel;
 	fractalresult result;
+	int totalPixels, currentPixel = 0;
+	int lastPercent = -1;
+	int progressInterval;
 	
 	printf ("Calculating EscapeTimeFractal Matrix with DDp1 ...\n");
 	
+	// Calculer le nombre total de pixels à traiter (grille 2x2)
+	totalPixels = ((f->xpixel + 1) / 2) * ((f->ypixel + 1) / 2);
+	progressInterval = totalPixels / 100;
+	if (progressInterval < 1) progressInterval = 1;
+	
 	for (j=0; j<f->ypixel; j=j+2) {
 		for (i=0; i<f->xpixel; i=i+2) {
+			// Mise à jour de la progression
+			if (guiPtr != NULL && (currentPixel % progressInterval == 0)) {
+				int percent = progressStart + ((currentPixel * (progressEnd - progressStart)) / totalPixels);
+				if (percent != lastPercent && percent <= progressEnd) {
+					SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
+					*progress = percent;
+					lastPercent = percent;
+				}
+			}
+			currentPixel++;
 			
 			xg = ((f->xmax-f->xmin)/f->xpixel)*i + f->xmin;
 			yg = ((f->ymax-f->ymin)/f->ypixel)*j + f->ymin;
@@ -97,18 +366,240 @@ void Fractal_CalculateMatrix_DDp1 (fractal* f) {
 	}
 }
 
-void Fractal_CalculateMatrix_DDp2 (fractal* f) {
+#ifdef HAVE_GMP
+static void Fractal_CalculateMatrix_DDp2_GMP (fractal* f, SDL_Surface* canvas, void* guiPtr, int* progress, int progressStart, int progressEnd, const char* fractalName) {
+	int i,starti, j, compteur;
+	int up, down, left, right;
+	complex zup, zdown, zleft, zright;
+	complex_gmp zPixel_gmp;
+	mpf_t xg, yg;
+	mp_bitcnt_t prec = f->gmp_precision;
+	fractalresult result;
+	int totalPixels, currentPixel = 0;
+	int lastPercent = -1;
+	int progressInterval;
+	int pass1Pixels, pass2Pixels;
+	
+	printf ("Calculating EscapeTimeFractal Matrix with DDp2 (GMP) ...\n");
+	
+	// Calculer le nombre total de pixels à traiter
+	// Pass 1: pixels impairs (j=1, i=1, step 2)
+	pass1Pixels = ((f->xpixel - 1) / 2) * ((f->ypixel - 1) / 2);
+	// Pass 2: pixels restants (divergence detection)
+	pass2Pixels = (f->xpixel * f->ypixel) / 2;
+	totalPixels = pass1Pixels + pass2Pixels;
+	progressInterval = totalPixels / 100;
+	if (progressInterval < 1) progressInterval = 1;
+	
+	mpf_init2(xg, prec);
+	mpf_init2(yg, prec);
+	
+	// Pass 1: Calcul initial
+	for (j=1; j<f->ypixel; j=j+2) {
+		for (i=1; i<f->xpixel; i=i+2) {
+			// Mise à jour de la progression
+			if (guiPtr != NULL && (currentPixel % progressInterval == 0)) {
+				int percent = progressStart + ((currentPixel * (progressEnd - progressStart)) / totalPixels);
+				if (percent != lastPercent && percent <= progressEnd) {
+					SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
+					*progress = percent;
+					lastPercent = percent;
+				}
+			}
+			currentPixel++;
+			// Calcul des coordonnées en GMP directement depuis les coordonnées GMP
+			mpf_t range_x, range_y, step_x, step_y, i_mpf, j_mpf;
+			mpf_init2(range_x, prec);
+			mpf_init2(range_y, prec);
+			mpf_init2(step_x, prec);
+			mpf_init2(step_y, prec);
+			mpf_init2(i_mpf, prec);
+			mpf_init2(j_mpf, prec);
+			
+			mpf_sub(range_x, f->xmax_gmp, f->xmin_gmp);
+			mpf_sub(range_y, f->ymax_gmp, f->ymin_gmp);
+			mpf_set_ui(i_mpf, i);
+			mpf_set_ui(j_mpf, j);
+			mpf_set_ui(step_x, f->xpixel);
+			mpf_set_ui(step_y, f->ypixel);
+			
+			mpf_div(step_x, range_x, step_x);
+			mpf_mul(xg, step_x, i_mpf);
+			mpf_add(xg, xg, f->xmin_gmp);
+			
+			mpf_div(step_y, range_y, step_y);
+			mpf_mul(yg, step_y, j_mpf);
+			mpf_add(yg, yg, f->ymin_gmp);
+			
+			zPixel_gmp = complex_gmp_make(xg, yg, prec);
+			result = FormulaSelector_GMP(*f, zPixel_gmp);
+			
+			*((f->fmatrix)+((f->xpixel*j)+i)) = result.iteration;
+			*((f->zmatrix)+((f->xpixel*j)+i)) = result.z;
+			if (f->zmatrix_gmp != NULL) {
+				complex_gmp_clear(&f->zmatrix_gmp[(f->xpixel*j)+i]);
+				f->zmatrix_gmp[(f->xpixel*j)+i] = complex_to_gmp(result.z, prec);
+			}
+			
+			complex_gmp_clear(&zPixel_gmp);
+			mpf_clear(range_x);
+			mpf_clear(range_y);
+			mpf_clear(step_x);
+			mpf_clear(step_y);
+			mpf_clear(i_mpf);
+			mpf_clear(j_mpf);
+		}
+	}
+
+	// Pass 2: Dernier passage, cette fois on compare pour savoir si l'on peut se
+	// permettre d'eviter le calcul, c'est la Divergence Detection (DD)
+	
+	for (j=0; j<f->ypixel; j++) {
+		if (fmod (j,2) == 0) {starti=1;} else {starti=0;} // Lignes paires et impaires
+		for (i=starti; i<f->xpixel; i=i+2) {
+			// Mise à jour de la progression
+			if (guiPtr != NULL && (currentPixel % progressInterval == 0)) {
+				int percent = progressStart + ((currentPixel * (progressEnd - progressStart)) / totalPixels);
+				if (percent != lastPercent && percent <= progressEnd) {
+					SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
+					*progress = percent;
+					lastPercent = percent;
+				}
+			}
+			currentPixel++;
+			
+			// Verifions les bords des matrices pour eviter Seg Fault
+			compteur=0;
+			if (j != 0) {
+				up = *((f->fmatrix)+((f->xpixel*(j-1))+i));
+				zup = *((f->zmatrix)+((f->xpixel*(j-1))+i));
+				compteur++;
+      } else { up = 0; zup = ZeroSetofComplex();}
+      if (j < (f->ypixel-1)) {
+		  down = *((f->fmatrix)+((f->xpixel*(j+1))+i));
+		  zdown = *((f->zmatrix)+((f->xpixel*(j+1))+i));
+		  compteur++;
+      } else { down = 0; zdown = ZeroSetofComplex(); }
+      if (i != 0) {
+		  left = *((f->fmatrix)+((f->xpixel*j)+(i-1)));
+		  zleft = *((f->zmatrix)+((f->xpixel*j)+(i-1)));
+		  compteur++;
+      } else { left = 0; zleft = ZeroSetofComplex();}
+      if (i < (f->xpixel-1)) {
+		  right = *((f->fmatrix)+((f->xpixel*j)+(i+1)));
+		  zright = *((f->zmatrix)+((f->xpixel*j)+(i+1)));
+		  compteur++;
+      } else { right = 0; zright = ZeroSetofComplex();}
+      
+      /* Si les points adjacents ont meme valeur de divergence alors */
+      if ((up == right) && (right == down) && (down == left) && (left == up)) {
+		  
+		  // OK, on ne calcule pas les Iterations
+		  *((f->fmatrix)+((f->xpixel*j)+i)) = up;
+		  
+		  // Et on calcule une moyenne pour la valeur de z
+		  double rz, iz;
+		  rz = (Rez(zup)+Rez(zdown)+Rez(zleft)+Rez(zright))/compteur;
+		  iz = (Imz(zup)+Imz(zdown)+Imz(zleft)+Imz(zright))/compteur;
+		  *((f->zmatrix)+((f->xpixel*j)+i)) = MakeComplex (rz, iz);
+		  if (f->zmatrix_gmp != NULL) {
+			  complex_gmp_clear(&f->zmatrix_gmp[(f->xpixel*j)+i]);
+			  f->zmatrix_gmp[(f->xpixel*j)+i] = complex_to_gmp(*((f->zmatrix)+((f->xpixel*j)+i)), prec);
+		  }
+		  
+      } else { // Sinon, je calcule
+		  // Calcul des coordonnées en GMP directement depuis les coordonnées GMP
+		  mpf_t range_x, range_y, step_x, step_y, i_mpf, j_mpf;
+		  mpf_init2(range_x, prec);
+		  mpf_init2(range_y, prec);
+		  mpf_init2(step_x, prec);
+		  mpf_init2(step_y, prec);
+		  mpf_init2(i_mpf, prec);
+		  mpf_init2(j_mpf, prec);
+		  
+		  mpf_sub(range_x, f->xmax_gmp, f->xmin_gmp);
+		  mpf_sub(range_y, f->ymax_gmp, f->ymin_gmp);
+		  mpf_set_ui(i_mpf, i);
+		  mpf_set_ui(j_mpf, j);
+		  mpf_set_ui(step_x, f->xpixel);
+		  mpf_set_ui(step_y, f->ypixel);
+		  
+		  mpf_div(step_x, range_x, step_x);
+		  mpf_mul(xg, step_x, i_mpf);
+		  mpf_add(xg, xg, f->xmin_gmp);
+		  
+		  mpf_div(step_y, range_y, step_y);
+		  mpf_mul(yg, step_y, j_mpf);
+		  mpf_add(yg, yg, f->ymin_gmp);
+		  
+		  zPixel_gmp = complex_gmp_make(xg, yg, prec);
+		  result = FormulaSelector_GMP(*f, zPixel_gmp);
+		  
+		  *((f->fmatrix)+((f->xpixel*j)+i)) = result.iteration;
+		  *((f->zmatrix)+((f->xpixel*j)+i)) = result.z;
+		  if (f->zmatrix_gmp != NULL) {
+			  complex_gmp_clear(&f->zmatrix_gmp[(f->xpixel*j)+i]);
+			  f->zmatrix_gmp[(f->xpixel*j)+i] = complex_to_gmp(result.z, prec);
+		  }
+		  
+		  complex_gmp_clear(&zPixel_gmp);
+		  mpf_clear(range_x);
+		  mpf_clear(range_y);
+		  mpf_clear(step_x);
+		  mpf_clear(step_y);
+		  mpf_clear(i_mpf);
+		  mpf_clear(j_mpf);
+      }
+		}
+	}
+	
+	mpf_clear(xg);
+	mpf_clear(yg);
+}
+#endif
+
+void Fractal_CalculateMatrix_DDp2 (fractal* f, SDL_Surface* canvas, void* guiPtr, int* progress, int progressStart, int progressEnd, const char* fractalName) {
+#ifdef HAVE_GMP
+	if (f->use_gmp) {
+		Fractal_CalculateMatrix_DDp2_GMP(f, canvas, guiPtr, progress, progressStart, progressEnd, fractalName);
+		return;
+	}
+#endif
 	int i,starti, j, compteur;
 	int up, down, left, right;
 	complex zup, zdown, zleft, zright;
 	double xg, yg, rz, iz;
 	complex zPixel;
 	fractalresult result;
+	int totalPixels, currentPixel = 0;
+	int lastPercent = -1;
+	int progressInterval;
+	int pass1Pixels, pass2Pixels;
 	
 	printf ("Calculating EscapeTimeFractal Matrix with DDp2 ...\n");
 	
+	// Calculer le nombre total de pixels à traiter
+	// Pass 1: pixels impairs (j=1, i=1, step 2)
+	pass1Pixels = ((f->xpixel - 1) / 2) * ((f->ypixel - 1) / 2);
+	// Pass 2: pixels restants (divergence detection)
+	pass2Pixels = (f->xpixel * f->ypixel) / 2;
+	totalPixels = pass1Pixels + pass2Pixels;
+	progressInterval = totalPixels / 100;
+	if (progressInterval < 1) progressInterval = 1;
+	
+	// Pass 1: Calcul initial
 	for (j=1; j<f->ypixel; j=j+2) {
 		for (i=1; i<f->xpixel; i=i+2) {
+			// Mise à jour de la progression
+			if (guiPtr != NULL && (currentPixel % progressInterval == 0)) {
+				int percent = progressStart + ((currentPixel * (progressEnd - progressStart)) / totalPixels);
+				if (percent != lastPercent && percent <= progressEnd) {
+					SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
+					*progress = percent;
+					lastPercent = percent;
+				}
+			}
+			currentPixel++;
 			
 			xg = ((f->xmax-f->xmin)/f->xpixel)*i + f->xmin;
 			yg = ((f->ymax-f->ymin)/f->ypixel)*j + f->ymin;
@@ -120,12 +611,22 @@ void Fractal_CalculateMatrix_DDp2 (fractal* f) {
 		}
 	}
 
-	// Dernier passage, cette fois on compare pour savoir si l'on peut se
+	// Pass 2: Dernier passage, cette fois on compare pour savoir si l'on peut se
 	// permettre d'eviter le calcul, c'est la Divergence Detection (DD)
 	
 	for (j=0; j<f->ypixel; j++) {
 		if (fmod (j,2) == 0) {starti=1;} else {starti=0;} // Lignes paires et impaires
 		for (i=starti; i<f->xpixel; i=i+2) {
+			// Mise à jour de la progression
+			if (guiPtr != NULL && (currentPixel % progressInterval == 0)) {
+				int percent = progressStart + ((currentPixel * (progressEnd - progressStart)) / totalPixels);
+				if (percent != lastPercent && percent <= progressEnd) {
+					SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
+					*progress = percent;
+					lastPercent = percent;
+				}
+			}
+			currentPixel++;
 			
 			// Verifions les bords des matrices pour eviter Seg Fault
 			compteur=0;
@@ -420,7 +921,14 @@ void FractalColorSmoothOcean(fractal* f) {
 /* Selection du mode de couleur */
 //**********************************
 
-void Fractal_CalculateColorMatrix (fractal* f) {
+void Fractal_CalculateColorMatrix (fractal* f, SDL_Surface* canvas, void* guiPtr, int* progress, int progressStart, int progressEnd) {
+	int totalPixels = f->xpixel * f->ypixel;
+	int currentPixel = 0;
+	int lastPercent = -1;
+	int progressInterval = totalPixels / 100;
+	if (progressInterval < 1) progressInterval = 1;
+	const char* fractalName = Fractal_GetTypeName(f->type);
+	
 	switch (f->colorMode) {
 		case 0: FractalColorNormal(f); break;
 		case 1: FractalColorMonochrome(f); break;
@@ -430,6 +938,29 @@ void Fractal_CalculateColorMatrix (fractal* f) {
 		case 5: FractalColorSmoothFire(f); break;
 		case 6: FractalColorSmoothOcean(f); break;
 		default: FractalColorNormal(f);
+	}
+	
+	// Mise à jour de la progression après colorisation
+	// On simule la progression en parcourant les pixels
+	if (guiPtr != NULL) {
+		for (int j = 0; j < f->ypixel; j++) {
+			for (int i = 0; i < f->xpixel; i++) {
+				if (currentPixel % progressInterval == 0) {
+					int percent = progressStart + ((currentPixel * (progressEnd - progressStart)) / totalPixels);
+					if (percent != lastPercent && percent <= progressEnd) {
+						SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
+						*progress = percent;
+						lastPercent = percent;
+					}
+				}
+				currentPixel++;
+			}
+		}
+		// Assurer que la progression atteint progressEnd
+		if (*progress < progressEnd) {
+			SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progressEnd, fractalName);
+			*progress = progressEnd;
+		}
 	}
 }
 
@@ -450,16 +981,21 @@ int Fractal_ReadColorMatrixGreen (fractal f, int i, int j) {
 
 
 
-Uint32 Fractal_Draw (SDL_Surface *canvas, fractal myfractal,int decalageX,int decalageY) {
+Uint32 Fractal_Draw (SDL_Surface *canvas, fractal myfractal,int decalageX,int decalageY, void* guiPtr) {
 
 	int i, j;
 	Uint8 r, g, b;
 	Uint32 time; // Test de temps de calcul en ms
+	int progress = 0;
+	const char* fractalName = Fractal_GetTypeName(myfractal.type);
 
 	time = SDL_GetTicks();
 
-	Fractal_CalculateMatrix_DDp1 (&myfractal);
-	Fractal_CalculateColorMatrix (&myfractal);
+	// DDp1 : 0-25%
+	Fractal_CalculateMatrix_DDp1 (&myfractal, canvas, guiPtr, &progress, 0, 25, fractalName);
+	
+	// Colorisation après DDp1 : 25-37.5%
+	Fractal_CalculateColorMatrix (&myfractal, canvas, guiPtr, &progress, 25, 37);
 
 	//Draw Demi-Fractal to the SDL_Buffer and colorize it
 	for (i=0; i<myfractal.xpixel; i++) {
@@ -471,9 +1007,18 @@ Uint32 Fractal_Draw (SDL_Surface *canvas, fractal myfractal,int decalageX,int de
 		}
 	}
 	SDL_UpdateRect (canvas, 0, 0, canvas->w, canvas->h);
+	
+	// Mise à jour progression après affichage DDp1 : 37-37.5%
+	if (guiPtr != NULL) {
+		progress = 37;
+		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progress, fractalName);
+	}
 
-	Fractal_CalculateMatrix_DDp2 (&myfractal);
-	Fractal_CalculateColorMatrix (&myfractal);
+	// DDp2 : 37.5-87.5%
+	Fractal_CalculateMatrix_DDp2 (&myfractal, canvas, guiPtr, &progress, 37, 87, fractalName);
+	
+	// Colorisation après DDp2 : 87.5-100%
+	Fractal_CalculateColorMatrix (&myfractal, canvas, guiPtr, &progress, 87, 100);
 
 	//Draw last Demi-Fractal to the SDL_Buffer and colorize it
 	for (i=0; i<myfractal.xpixel; i++) {
@@ -485,12 +1030,32 @@ Uint32 Fractal_Draw (SDL_Surface *canvas, fractal myfractal,int decalageX,int de
 		}
 	}
 	SDL_UpdateRect (canvas, 0, 0, canvas->w, canvas->h);
+	
+	// Mise à jour progression finale : 100%
+	if (guiPtr != NULL) {
+		progress = 100;
+		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progress, fractalName);
+	}
+	
 	time = SDL_GetTicks() - time;
 	printf ("Time Elapsed : %d ms\n", time);
 	return time;
 }
 
 void Fractal_ChangeType (fractal* f, int type) {
+#ifdef HAVE_GMP
+	// Libérer la mémoire GMP existante avant de changer de type
+	if (f->zmatrix_gmp != NULL) {
+		for (int i = 0; i < f->xpixel * f->ypixel; i++) {
+			complex_gmp_clear(&f->zmatrix_gmp[i]);
+		}
+		free(f->zmatrix_gmp);
+		f->zmatrix_gmp = NULL;
+	}
+	f->use_gmp = 0;
+	f->gmp_precision = 64;
+#endif
+
 	f->type = type;
 	printf ("On initialise une EscapeTimeFractal de type %d\n",type);
 
@@ -541,6 +1106,82 @@ void Fractal_ChangeType (fractal* f, int type) {
 	default:
 	Mendelbrot_def (f);
 	}
+
+#ifdef HAVE_GMP
+	// Mettre à jour la précision après le changement de type
+	precision_update_fractal(f);
+	
+	// Synchroniser les coordonnées double → GMP
+	// Les coordonnées GMP sont toujours initialisées dans Fractal_Init
+	// On vérifie juste si la précision doit être mise à jour
+	if (f->use_gmp) {
+		// Les coordonnées GMP sont toujours initialisées dans Fractal_Init
+		// On met juste à jour la précision si nécessaire
+		mp_bitcnt_t current_prec = mpf_get_prec(f->xmin_gmp);
+		if (current_prec != f->gmp_precision) {
+			// Mettre à jour la précision si nécessaire
+			mpf_set_prec(f->xmin_gmp, f->gmp_precision);
+			mpf_set_prec(f->xmax_gmp, f->gmp_precision);
+			mpf_set_prec(f->ymin_gmp, f->gmp_precision);
+			mpf_set_prec(f->ymax_gmp, f->gmp_precision);
+		}
+		// Synchroniser les valeurs
+		mpf_set_d(f->xmin_gmp, f->xmin);
+		mpf_set_d(f->xmax_gmp, f->xmax);
+		mpf_set_d(f->ymin_gmp, f->ymin);
+		mpf_set_d(f->ymax_gmp, f->ymax);
+	}
+	
+	// Réallouer zmatrix_gmp si nécessaire
+	if (f->use_gmp) {
+		if (f->zmatrix_gmp != NULL) {
+			for (int i = 0; i < f->xpixel * f->ypixel; i++) {
+				complex_gmp_clear(&f->zmatrix_gmp[i]);
+			}
+			free(f->zmatrix_gmp);
+		}
+		f->zmatrix_gmp = (complex_gmp *) malloc ((f->xpixel*f->ypixel)* sizeof (complex_gmp));
+		if (f->zmatrix_gmp == NULL) {
+			fprintf(stderr, "Erreur allocation mémoire GMP fractale\n");
+			exit(1);
+		}
+		// Initialiser tous les éléments GMP
+		for (int i = 0; i < f->xpixel * f->ypixel; i++) {
+			complex_gmp_init(&f->zmatrix_gmp[i], f->gmp_precision);
+		}
+	}
+#endif
+}
+
+// *************************************************************************
+// *	Fonction utilitaire pour obtenir le nom de la fractale
+// *************************************************************************
+
+const char* Fractal_GetTypeName(int type) {
+	const char* typeNames[] = {
+		"",           // 0
+		"Von Koch",   // 1
+		"Dragon",     // 2
+		"Mandelbrot", // 3
+		"Julia",      // 4
+		"Julia Sin",  // 5
+		"Newton",     // 6
+		"Phoenix",    // 7
+		"Sierpinski", // 8
+		"Barnsley J", // 9
+		"Barnsley M", // 10
+		"Magnet J",   // 11
+		"Magnet M",   // 12
+		"Burning Ship", // 13
+		"Tricorn",    // 14
+		"Mandelbulb", // 15
+		"Buddhabrot"  // 16
+	};
+	
+	if (type >= 0 && type <= 16) {
+		return typeNames[type];
+	}
+	return "Unknown";
 }
 
 // *************************************************************************
@@ -761,8 +1402,8 @@ void Sierpinski_def (fractal* f) {
 	/* Valeurs de base pour la Sierpinski */
 	f->xmin = -1.333402669;
 	f->xmax = 2.133402669;
-	f->ymin = 1.700052002;
-	f->ymax = -0.9000520021;
+	f->ymin = -0.9000520021;  // Corrigé : ymin doit être < ymax
+	f->ymax = 1.700052002;     // Corrigé : ymax doit être > ymin
 	f->bailout= 127;
 	f->iterationMax= 149;
 	f->zoomfactor = 4;
@@ -1175,9 +1816,723 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 	return time;
 }
 
+#ifdef HAVE_GMP
+// ******************************************************
+// Versions GMP des fonctions d'itération
+// ******************************************************
+
+fractalresult Mendelbrot_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, zTemp;
+	mpf_t mag, bailout_mpf;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	complex_gmp seed_gmp = complex_to_gmp(f.seed, prec);
+	
+	z = complex_gmp_copy(seed_gmp, prec);
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	
+	do {
+		i++;
+		zTemp = complex_gmp_mul(z, z, prec);
+		z = complex_gmp_add(zTemp, zPixel, prec);
+		complex_gmp_mag(mag, z);
+		complex_gmp_clear(&zTemp);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&seed_gmp);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	
+	return result;
+}
+
+fractalresult Julia_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, zTemp, seed_gmp;
+	mpf_t mag, bailout_mpf;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(zPixel, prec);
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	
+	do {
+		i++;
+		zTemp = complex_gmp_mul(z, z, prec);
+		z = complex_gmp_add(zTemp, seed_gmp, prec);
+		complex_gmp_mag(mag, z);
+		complex_gmp_clear(&zTemp);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&seed_gmp);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	
+	return result;
+}
+
+fractalresult JuliaSin_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, seed_gmp, sin_z;
+	mpf_t mag, bailout_mpf;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(zPixel, prec);
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	
+	do {
+		i++;
+		sin_z = complex_gmp_sin(z, prec);
+		z = complex_gmp_mul(seed_gmp, sin_z, prec);
+		complex_gmp_mag(mag, z);
+		complex_gmp_clear(&sin_z);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&seed_gmp);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	
+	return result;
+}
+
+fractalresult Newton_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, zNum, zQuot, p_minus_one, p_val, one, p_minus_one_z;
+	mpf_t mag, bailout_mpf, p_mpf, p_minus_one_mpf, zero_mpf;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	z = complex_gmp_copy(zPixel, prec);
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(p_mpf, prec);
+	mpf_init2(p_minus_one_mpf, prec);
+	mpf_init2(zero_mpf, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	mpf_set_ui(zero_mpf, 0);
+	
+	double p_d = Rez(f.seed);
+	mpf_set_d(p_mpf, p_d);
+	mpf_set_d(p_minus_one_mpf, p_d - 1.0);
+	
+	one = complex_gmp_one(prec);
+	p_val = complex_gmp_make(p_mpf, zero_mpf, prec);
+	p_minus_one = complex_gmp_make(p_minus_one_mpf, zero_mpf, prec);
+	
+	do {
+		complex_gmp z_pow_p, z_pow_p_minus_one;
+		i++;
+		
+		// z^p
+		z_pow_p = complex_gmp_pow_n(z, p_val, 0, prec);
+		// (p-1)*z^p + 1
+		p_minus_one_z = complex_gmp_mul(p_minus_one, z_pow_p, prec);
+		zNum = complex_gmp_add(p_minus_one_z, one, prec);
+		
+		// z^(p-1)
+		z_pow_p_minus_one = complex_gmp_pow_n(z, p_minus_one, 0, prec);
+		// p*z^(p-1)
+		zQuot = complex_gmp_mul(p_val, z_pow_p_minus_one, prec);
+		
+		// z = zNum / zQuot
+		z = complex_gmp_div(zNum, zQuot, prec);
+		
+		complex_gmp_mag(mag, z);
+		
+		complex_gmp_clear(&z_pow_p);
+		complex_gmp_clear(&z_pow_p_minus_one);
+		complex_gmp_clear(&p_minus_one_z);
+		complex_gmp_clear(&zNum);
+		complex_gmp_clear(&zQuot);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&one);
+	complex_gmp_clear(&p_val);
+	complex_gmp_clear(&p_minus_one);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	mpf_clear(p_mpf);
+	mpf_clear(p_minus_one_mpf);
+	mpf_clear(zero_mpf);
+	
+	return result;
+}
+
+fractalresult Phoenix_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, y, zTemp, zpTemp;
+	mpf_t mag, bailout_mpf, p1, p2, z_real;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	z = complex_gmp_copy(zPixel, prec);
+	y = complex_gmp_zero(prec);
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(p1, prec);
+	mpf_init2(p2, prec);
+	mpf_init2(z_real, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	mpf_set_d(p1, 0.56667);
+	mpf_set_d(p2, -0.5);
+	
+	do {
+		i++;
+		zTemp = complex_gmp_mul(z, z, prec);
+		complex_gmp_get_real(z_real, zTemp);
+		mpf_add(z_real, z_real, p1);
+		complex_gmp_set_real(&zTemp, z_real);
+		
+		zpTemp = complex_gmp_scalar_mul(p2, y, prec);
+		zTemp = complex_gmp_add(zTemp, zpTemp, prec);
+		
+		y = z;
+		z = zTemp;
+		
+		complex_gmp_mag(mag, z);
+		complex_gmp_clear(&zpTemp);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&y);
+	complex_gmp_clear(&zTemp);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	mpf_clear(p1);
+	mpf_clear(p2);
+	mpf_clear(z_real);
+	
+	return result;
+}
+
+fractalresult Sierpinski_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, z_new;
+	mpf_t mag, bailout_mpf, z_real, z_imag, two, one_mpf, half_mpf;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	z = complex_gmp_copy(zPixel, prec);
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(z_real, prec);
+	mpf_init2(z_imag, prec);
+	mpf_init2(two, prec);
+	mpf_init2(one_mpf, prec);
+	mpf_init2(half_mpf, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	mpf_set_ui(two, 2);
+	mpf_set_ui(one_mpf, 1);
+	mpf_set_d(half_mpf, 0.5);
+	
+	do {
+		i++;
+		complex_gmp_get_real(z_real, z);
+		complex_gmp_get_imag(z_imag, z);
+		
+		if (mpf_cmp(z_imag, half_mpf) > 0) {
+			// z = (2*x, 2*y-1)
+			mpf_t temp_real, temp_imag;
+			mpf_init2(temp_real, prec);
+			mpf_init2(temp_imag, prec);
+			mpf_mul(temp_real, z_real, two);
+			mpf_mul(temp_imag, z_imag, two);
+			mpf_sub(temp_imag, temp_imag, one_mpf);
+			z_new = complex_gmp_make(temp_real, temp_imag, prec);
+			mpf_clear(temp_real);
+			mpf_clear(temp_imag);
+		} else if (mpf_cmp(z_real, half_mpf) > 0) {
+			// z = (2*x-1, 2*y)
+			mpf_t temp_real, temp_imag;
+			mpf_init2(temp_real, prec);
+			mpf_init2(temp_imag, prec);
+			mpf_mul(temp_real, z_real, two);
+			mpf_sub(temp_real, temp_real, one_mpf);
+			mpf_mul(temp_imag, z_imag, two);
+			z_new = complex_gmp_make(temp_real, temp_imag, prec);
+			mpf_clear(temp_real);
+			mpf_clear(temp_imag);
+		} else {
+			// z = (2*x, 2*y)
+			mpf_t temp_real, temp_imag;
+			mpf_init2(temp_real, prec);
+			mpf_init2(temp_imag, prec);
+			mpf_mul(temp_real, z_real, two);
+			mpf_mul(temp_imag, z_imag, two);
+			z_new = complex_gmp_make(temp_real, temp_imag, prec);
+			mpf_clear(temp_real);
+			mpf_clear(temp_imag);
+		}
+		
+		complex_gmp_clear(&z);
+		z = z_new;
+		
+		complex_gmp_mag(mag, z);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	mpf_clear(z_real);
+	mpf_clear(z_imag);
+	mpf_clear(two);
+	mpf_clear(one_mpf);
+	mpf_clear(half_mpf);
+	
+	return result;
+}
+
+fractalresult Barnsley1j_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, zTemp, seed_gmp, one;
+	mpf_t mag, bailout_mpf, z_real, one_mpf;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(zPixel, prec);
+	one = complex_gmp_one(prec);
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(z_real, prec);
+	mpf_init2(one_mpf, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	mpf_set_ui(one_mpf, 1);
+	
+	do {
+		i++;
+		complex_gmp_get_real(z_real, z);
+		
+		if (mpf_cmp(z_real, one_mpf) >= 0) {
+			zTemp = complex_gmp_sub(z, one, prec);
+		} else {
+			zTemp = complex_gmp_add(z, one, prec);
+		}
+		z = complex_gmp_mul(zTemp, seed_gmp, prec);
+		complex_gmp_mag(mag, z);
+		complex_gmp_clear(&zTemp);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&seed_gmp);
+	complex_gmp_clear(&one);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	mpf_clear(z_real);
+	mpf_clear(one_mpf);
+	
+	return result;
+}
+
+fractalresult Barnsley1m_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, c, zTemp, one;
+	mpf_t mag, bailout_mpf, z_real, one_mpf;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	c = complex_gmp_copy(zPixel, prec);
+	z = complex_gmp_zero(prec);
+	one = complex_gmp_one(prec);
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(z_real, prec);
+	mpf_init2(one_mpf, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	mpf_set_ui(one_mpf, 1);
+	
+	do {
+		i++;
+		complex_gmp_get_real(z_real, z);
+		
+		if (mpf_cmp(z_real, one_mpf) >= 0) {
+			zTemp = complex_gmp_sub(z, one, prec);
+		} else {
+			zTemp = complex_gmp_add(z, one, prec);
+		}
+		z = complex_gmp_mul(zTemp, c, prec);
+		complex_gmp_mag(mag, z);
+		complex_gmp_clear(&zTemp);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&c);
+	complex_gmp_clear(&one);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	mpf_clear(z_real);
+	mpf_clear(one_mpf);
+	
+	return result;
+}
+
+fractalresult BurningShip_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, zTemp, zAbs;
+	mpf_t mag, bailout_mpf, z_real, z_imag, abs_real, abs_imag;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	complex_gmp seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(seed_gmp, prec);
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(z_real, prec);
+	mpf_init2(z_imag, prec);
+	mpf_init2(abs_real, prec);
+	mpf_init2(abs_imag, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	
+	do {
+		i++;
+		complex_gmp_get_real(z_real, z);
+		complex_gmp_get_imag(z_imag, z);
+		
+		// |Re(z)| et |Im(z)|
+		mpf_abs(abs_real, z_real);
+		mpf_abs(abs_imag, z_imag);
+		
+		zAbs = complex_gmp_make(abs_real, abs_imag, prec);
+		zTemp = complex_gmp_mul(zAbs, zAbs, prec);
+		z = complex_gmp_add(zTemp, zPixel, prec);
+		
+		complex_gmp_mag(mag, z);
+		complex_gmp_clear(&zTemp);
+		complex_gmp_clear(&zAbs);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&seed_gmp);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	mpf_clear(z_real);
+	mpf_clear(z_imag);
+	mpf_clear(abs_real);
+	mpf_clear(abs_imag);
+	
+	return result;
+}
+
+fractalresult Tricorn_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, zTemp, zConj;
+	mpf_t mag, bailout_mpf, z_imag;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	complex_gmp seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(seed_gmp, prec);
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(z_imag, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	
+	do {
+		i++;
+		// Conjugué: (x, -y)
+		mpf_t z_real_conj;
+		mpf_init2(z_real_conj, prec);
+		complex_gmp_get_real(z_real_conj, z);
+		complex_gmp_get_imag(z_imag, z);
+		mpf_neg(z_imag, z_imag);
+		zConj = complex_gmp_make(z_real_conj, z_imag, prec);
+		mpf_clear(z_real_conj);
+		
+		zTemp = complex_gmp_mul(zConj, zConj, prec);
+		z = complex_gmp_add(zTemp, zPixel, prec);
+		
+		complex_gmp_mag(mag, z);
+		complex_gmp_clear(&zTemp);
+		complex_gmp_clear(&zConj);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&seed_gmp);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	mpf_clear(z_imag);
+	
+	return result;
+}
+
+fractalresult Mandelbulb_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, zTemp;
+	mpf_t mag, bailout_mpf;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	complex_gmp seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(seed_gmp, prec);
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	
+	do {
+		i++;
+		// z^8 par multiplications successives
+		zTemp = complex_gmp_mul(z, z, prec);      // z^2
+		zTemp = complex_gmp_mul(zTemp, zTemp, prec); // z^4
+		zTemp = complex_gmp_mul(zTemp, zTemp, prec); // z^8
+		z = complex_gmp_add(zTemp, zPixel, prec);
+		
+		complex_gmp_mag(mag, z);
+		complex_gmp_clear(&zTemp);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&seed_gmp);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	
+	return result;
+}
+
+fractalresult Magnet1j_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, N, Q, seed_gmp, one, two, seed_minus_one, seed_minus_two;
+	mpf_t mag, bailout_mpf;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(zPixel, prec);
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	
+	// Constantes
+	mpf_t two_mpf;
+	mpf_init2(two_mpf, prec);
+	mpf_set_ui(two_mpf, 2);
+	one = complex_gmp_one(prec);
+	two = complex_gmp_scalar_mul(two_mpf, one, prec);
+	mpf_clear(two_mpf);
+	
+	// seed - 1 et seed - 2
+	seed_minus_one = complex_gmp_sub(seed_gmp, one, prec);
+	seed_minus_two = complex_gmp_sub(seed_gmp, two, prec);
+	
+	do {
+		i++;
+		// N = (z^2 + seed - 1)^2
+		complex_gmp z_sq = complex_gmp_mul(z, z, prec);
+		N = complex_gmp_add(z_sq, seed_minus_one, prec);
+		N = complex_gmp_mul(N, N, prec);
+		
+		// Q = 2*z + seed - 2
+		complex_gmp two_z = complex_gmp_mul(two, z, prec);
+		Q = complex_gmp_add(two_z, seed_minus_two, prec);
+		
+		// z = N / Q
+		z = complex_gmp_div(N, Q, prec);
+		
+		complex_gmp_mag(mag, z);
+		
+		complex_gmp_clear(&z_sq);
+		complex_gmp_clear(&two_z);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&seed_gmp);
+	complex_gmp_clear(&one);
+	complex_gmp_clear(&two);
+	complex_gmp_clear(&seed_minus_one);
+	complex_gmp_clear(&seed_minus_two);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	
+	return result;
+}
+
+fractalresult Magnet1m_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, c, N, Q, one, two, c_minus_one, c_minus_two;
+	mpf_t mag, bailout_mpf;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	c = complex_gmp_copy(zPixel, prec);
+	z = complex_gmp_zero(prec);
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	
+	// Constantes
+	mpf_t two_mpf;
+	mpf_init2(two_mpf, prec);
+	mpf_set_ui(two_mpf, 2);
+	one = complex_gmp_one(prec);
+	two = complex_gmp_scalar_mul(two_mpf, one, prec);
+	mpf_clear(two_mpf);
+	
+	// c - 1 et c - 2
+	c_minus_one = complex_gmp_sub(c, one, prec);
+	c_minus_two = complex_gmp_sub(c, two, prec);
+	
+	do {
+		i++;
+		// N = (z^2 + c - 1)^2
+		complex_gmp z_sq = complex_gmp_mul(z, z, prec);
+		N = complex_gmp_add(z_sq, c_minus_one, prec);
+		N = complex_gmp_mul(N, N, prec);
+		
+		// Q = 2*z + c - 2
+		complex_gmp two_z = complex_gmp_mul(two, z, prec);
+		Q = complex_gmp_add(two_z, c_minus_two, prec);
+		
+		// z = N / Q
+		z = complex_gmp_div(N, Q, prec);
+		
+		complex_gmp_mag(mag, z);
+		
+		complex_gmp_clear(&z_sq);
+		complex_gmp_clear(&two_z);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&c);
+	complex_gmp_clear(&one);
+	complex_gmp_clear(&two);
+	complex_gmp_clear(&c_minus_one);
+	complex_gmp_clear(&c_minus_two);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	
+	return result;
+}
+
+fractalresult FormulaSelector_GMP (fractal f, complex_gmp zPixel) {
+	fractalresult r;
+	
+	switch (f.type) {
+	case 3:
+		r = Mendelbrot_Iteration_GMP(f, zPixel);
+		break;
+	case 4:
+		r = Julia_Iteration_GMP(f, zPixel);
+		break;
+	case 5:
+		r = JuliaSin_Iteration_GMP(f, zPixel);
+		break;
+	case 6:
+		r = Newton_Iteration_GMP(f, zPixel);
+		break;
+	case 7:
+		r = Phoenix_Iteration_GMP(f, zPixel);
+		break;
+	case 8:
+		r = Sierpinski_Iteration_GMP(f, zPixel);
+		break;
+	case 9:
+		r = Barnsley1j_Iteration_GMP(f, zPixel);
+		break;
+	case 10:
+		r = Barnsley1m_Iteration_GMP(f, zPixel);
+		break;
+	case 11:
+		r = Magnet1j_Iteration_GMP(f, zPixel);
+		break;
+	case 12:
+		r = Magnet1m_Iteration_GMP(f, zPixel);
+		break;
+	case 13:
+		r = BurningShip_Iteration_GMP(f, zPixel);
+		break;
+	case 14:
+		r = Tricorn_Iteration_GMP(f, zPixel);
+		break;
+	case 15:
+		r = Mandelbulb_Iteration_GMP(f, zPixel);
+		break;
+	default:
+		r = Mendelbrot_Iteration_GMP(f, zPixel);
+		break;
+	}
+	
+	return r;
+}
+
+#endif /* HAVE_GMP */
+
 // Selectionne la formule
 fractalresult FormulaSelector (fractal f, complex zPixel) {
 	fractalresult r;
+
+#ifdef HAVE_GMP
+	if (f.use_gmp) {
+		complex_gmp zPixel_gmp = complex_to_gmp(zPixel, f.gmp_precision);
+		r = FormulaSelector_GMP(f, zPixel_gmp);
+		complex_gmp_clear(&zPixel_gmp);
+		return r;
+	}
+#endif
 
 	switch (f.type) {
 	case 3:

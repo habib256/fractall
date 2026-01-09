@@ -6,6 +6,11 @@
 
 #include "SDL.h"
 
+// Include EscapeTime.h pour avoir accès à la structure fractal
+// Utilisation d'une garde pour éviter les inclusions circulaires
+#ifndef ESCAPETIME_H
+#include "EscapeTime.h"
+#endif
 
 typedef struct {	// Definition d'un bouton
   char* name;
@@ -37,5 +42,5 @@ void SDLGUI_MenuBar_Draw (SDL_Surface*, gui*);
 extern void SDLGUI_Button_Draw (SDL_Surface*, gui*, int);
 void SDLGUI_Draw3DBox (SDL_Surface *surface, int x, int y, int w, int h, Uint32 bgcolor, int type);
 void SDLGUI_StateBar_Draw (SDL_Surface* screen, gui* g);
-void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMode, double centerX, double centerY, int zoomFactor, Uint32 renderTime);
+void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMode, double centerX, double centerY, int zoomFactor, Uint32 renderTime, fractal* f);
 void SDLGUI_StateBar_Progress (SDL_Surface* screen, gui* g, int percent, const char* task);
