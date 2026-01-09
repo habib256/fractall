@@ -262,8 +262,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			}
 			if (event->key.keysym.sym == SDLK_c)
 			{			// Changer palette de couleur
-				const char* palettes[] = {"Normal", "Mono", "Fire", "Ocean", "Rainbow", "SmoothFire", "SmoothOcean"};
-				f->colorMode = (f->colorMode + 1) % 7;
+				const char* palettes[] = {"SmoothFire", "Rainbow", "SmoothOcean"};
+				f->colorMode = (f->colorMode + 1) % 3;
 				printf ("Palette: %s\n", palettes[f->colorMode]);
 				if (*typeFractale >= 3) {
 					if (*typeFractale == 16) {

@@ -29,7 +29,7 @@ typedef struct {
   int bailout;
   int zoomfactor;
   int type;
-  int colorMode;   // 0=Normal, 1=Monochrome, 2=Fire, 3=Ocean
+  int colorMode;   // 0=SmoothFire, 1=Rainbow, 2=SmoothOcean
   int *fmatrix;    // la matrice d'iteration
   complex *zmatrix;  // la matrice de la valeur de z a la derniere iteration
   color *cmatrix; // Une matrice de couleurs, soit la fractale finale.
@@ -63,8 +63,6 @@ typedef struct {
 
  // Calcul de la couleur
  void Fractal_CalculateColorMatrix (fractal*, SDL_Surface*, void*, int*, int, int); // Selecteur
- void FractalColorMonochrome (fractal*);
- void FractalColorNormal (fractal*);
  void FractalColorTest (fractal*);
 
 // Color Formulae Utilities

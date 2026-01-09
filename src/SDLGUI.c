@@ -172,7 +172,7 @@ void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMod
 	const char* typeNames[] = {"", "Von Koch", "Dragon", "Mandelbrot", "Julia", "Julia Sin",
 		"Newton", "Phoenix", "Sierpinski", "Barnsley J", "Barnsley M",
 		"Magnet J", "Magnet M", "Burning Ship", "Tricorn", "Mandelbulb", "Buddhabrot"};
-	const char* paletteNames[] = {"Normal", "Mono", "Fire", "Ocean", "Rainbow", "SmoothFire", "SmoothOcean"};
+	const char* paletteNames[] = {"SmoothFire", "Rainbow", "SmoothOcean"};
 	char statusText[256];
 	char precisionText[64];
 	int precisionX;

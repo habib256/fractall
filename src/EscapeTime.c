@@ -682,25 +682,6 @@ void Fractal_CalculateMatrix_DDp2 (fractal* f, SDL_Surface* canvas, void* guiPtr
 // *************************
 
 /* Un mode de couleur classique */
-void FractalColorNormal (fractal* f) {
-	int i, j;
-	int iteration, greyvalue;
-	color c;
-
-	for (j = 0; j < f->ypixel; j++) {
-		for (i=0; i < f->xpixel; i++) {
-			iteration = *((f->fmatrix)+((f->xpixel*j)+i));
-			greyvalue = 255 - (iteration*255)/f->iterationMax;
-			c.g = (int) fmod (greyvalue*3, 510);
-			if (c.g > 255) { c.g = 255 - (c.g - 255); }
-			c.r = (int) fmod (greyvalue, 510);
-			if (c.r > 255) { c.r = 255 - (c.r - 255); }
-			c.b = (int) fmod (greyvalue*2, 510);
-			if (c.b > 255) { c.b = 255 - (c.b - 255); }
-			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
-		}
-	}
-}
 
 // Un mode de couleur bizarre pour tester que tout fonctionne avec les complexes
 void FractalColorTest (fractal* f) {
@@ -720,81 +701,6 @@ void FractalColorTest (fractal* f) {
 	}
 }
 
-/* Un mode de couleur monochrome */
-void FractalColorMonochrome (fractal* f) {
-	int i, j;
-	int iteration, greyvalue;
-	color c;
-
-	for (j = 0; j < f->ypixel; j++) {
-		for (i=0; i < f->xpixel; i++) {
-			iteration = *((f->fmatrix)+((f->xpixel*j)+i));
-			greyvalue = 255 - (iteration*255)/f->iterationMax;
-			c.g = greyvalue;
-			c.r = greyvalue;
-			c.b = greyvalue;
-			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
-		}
-	}
-}
-
-/* Palette Fire : noir -> rouge -> jaune -> blanc */
-void FractalColorFire (fractal* f) {
-	int i, j;
-	int iteration;
-	double t;
-	color c;
-
-	for (j = 0; j < f->ypixel; j++) {
-		for (i=0; i < f->xpixel; i++) {
-			iteration = *((f->fmatrix)+((f->xpixel*j)+i));
-			t = (double)iteration / f->iterationMax;
-			if (t < 0.33) {
-				c.r = (int)(t * 3 * 255);
-				c.g = 0;
-				c.b = 0;
-			} else if (t < 0.66) {
-				c.r = 255;
-				c.g = (int)((t - 0.33) * 3 * 255);
-				c.b = 0;
-			} else {
-				c.r = 255;
-				c.g = 255;
-				c.b = (int)((t - 0.66) * 3 * 255);
-			}
-			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
-		}
-	}
-}
-
-/* Palette Ocean : noir -> bleu -> cyan -> blanc */
-void FractalColorOcean (fractal* f) {
-	int i, j;
-	int iteration;
-	double t;
-	color c;
-
-	for (j = 0; j < f->ypixel; j++) {
-		for (i=0; i < f->xpixel; i++) {
-			iteration = *((f->fmatrix)+((f->xpixel*j)+i));
-			t = (double)iteration / f->iterationMax;
-			if (t < 0.33) {
-				c.r = 0;
-				c.g = 0;
-				c.b = (int)(t * 3 * 255);
-			} else if (t < 0.66) {
-				c.r = 0;
-				c.g = (int)((t - 0.33) * 3 * 255);
-				c.b = 255;
-			} else {
-				c.r = (int)((t - 0.66) * 3 * 255);
-				c.g = 255;
-				c.b = 255;
-			}
-			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
-		}
-	}
-}
 
 /* Calcul smooth iteration pour coloring continu */
 double Fractal_SmoothIteration(fractal* f, int i, int j) {
@@ -864,52 +770,56 @@ void FractalColorRainbow(fractal* f) {
 	}
 }
 
-/* Palette Smooth Fire : version fluide de Fire */
+/* Palette Smooth Fire : version fluide de Fire avec répétition 5x */
 void FractalColorSmoothFire(fractal* f) {
 	int i, j;
-	double t;
+	double t, t_repeat;
 	color c;
 
 	for (j = 0; j < f->ypixel; j++) {
 		for (i = 0; i < f->xpixel; i++) {
 			t = Fractal_SmoothIteration(f, i, j);
-			if (t < 0.33) {
-				c.r = (int)(t * 3 * 255);
+			// Répéter la palette 5 fois de 0 au bailout
+			t_repeat = fmod(t * 5.0, 1.0);
+			if (t_repeat < 0.33) {
+				c.r = (int)(t_repeat * 3 * 255);
 				c.g = 0;
 				c.b = 0;
-			} else if (t < 0.66) {
+			} else if (t_repeat < 0.66) {
 				c.r = 255;
-				c.g = (int)((t - 0.33) * 3 * 255);
+				c.g = (int)((t_repeat - 0.33) * 3 * 255);
 				c.b = 0;
 			} else {
 				c.r = 255;
 				c.g = 255;
-				c.b = (int)((t - 0.66) * 3 * 255);
+				c.b = (int)((t_repeat - 0.66) * 3 * 255);
 			}
 			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
 		}
 	}
 }
 
-/* Palette Smooth Ocean : version fluide de Ocean */
+/* Palette Smooth Ocean : version fluide de Ocean avec répétition 5x */
 void FractalColorSmoothOcean(fractal* f) {
 	int i, j;
-	double t;
+	double t, t_repeat;
 	color c;
 
 	for (j = 0; j < f->ypixel; j++) {
 		for (i = 0; i < f->xpixel; i++) {
 			t = Fractal_SmoothIteration(f, i, j);
-			if (t < 0.33) {
+			// Répéter la palette 5 fois de 0 au bailout
+			t_repeat = fmod(t * 5.0, 1.0);
+			if (t_repeat < 0.33) {
 				c.r = 0;
 				c.g = 0;
-				c.b = (int)(t * 3 * 255);
-			} else if (t < 0.66) {
+				c.b = (int)(t_repeat * 3 * 255);
+			} else if (t_repeat < 0.66) {
 				c.r = 0;
-				c.g = (int)((t - 0.33) * 3 * 255);
+				c.g = (int)((t_repeat - 0.33) * 3 * 255);
 				c.b = 255;
 			} else {
-				c.r = (int)((t - 0.66) * 3 * 255);
+				c.r = (int)((t_repeat - 0.66) * 3 * 255);
 				c.g = 255;
 				c.b = 255;
 			}
@@ -930,14 +840,10 @@ void Fractal_CalculateColorMatrix (fractal* f, SDL_Surface* canvas, void* guiPtr
 	const char* fractalName = Fractal_GetTypeName(f->type);
 	
 	switch (f->colorMode) {
-		case 0: FractalColorNormal(f); break;
-		case 1: FractalColorMonochrome(f); break;
-		case 2: FractalColorFire(f); break;
-		case 3: FractalColorOcean(f); break;
-		case 4: FractalColorRainbow(f); break;
-		case 5: FractalColorSmoothFire(f); break;
-		case 6: FractalColorSmoothOcean(f); break;
-		default: FractalColorNormal(f);
+		case 0: FractalColorSmoothFire(f); break;
+		case 1: FractalColorRainbow(f); break;
+		case 2: FractalColorSmoothOcean(f); break;
+		default: FractalColorSmoothFire(f);
 	}
 	
 	// Mise à jour de la progression après colorisation
@@ -1215,7 +1121,7 @@ void Mendelbrot_def (fractal* f) {
 	f->ymax = 1.5;
 	f->seed = ZeroSetofComplex ();
 	f->bailout= 4;
-	f->iterationMax= 150;
+	f->iterationMax= 1875;
 	f->zoomfactor = 8;
 }
 
@@ -1245,7 +1151,7 @@ void Julia_def (fractal* f) {
 	f->ymax = 1.5;
 	f->seed = MakeComplex (0.36228,- 0.0777);
 	f->bailout= 4;
-	f->iterationMax= 100;
+	f->iterationMax= 1250;
 	f->zoomfactor = 4;
 }
 
@@ -1278,7 +1184,7 @@ void JuliaSin_def (fractal* f) {
 	f->ymax = 2;
 	f->seed = MakeComplex (1,0.1);
 	f->bailout= 4;
-	f->iterationMax= 100;
+	f->iterationMax= 1250;
 	f->zoomfactor = 4;
 }
 
@@ -1315,7 +1221,7 @@ void Newton_def (fractal* f) {
 	f->ymin = -2;
 	f->ymax = 2;
 	f->bailout= 4;
-	f->iterationMax= 30;
+	f->iterationMax= 100;
 	f->zoomfactor = 4;
 }
 
@@ -1364,7 +1270,7 @@ void Phoenix_def (fractal* f) {
 	f->ymin = -1.5;
 	f->ymax = 1.5;
 	f->bailout= 4;
-	f->iterationMax= 150;
+	f->iterationMax= 1875;
 	f->zoomfactor = 8;
 }
 
@@ -1405,7 +1311,7 @@ void Sierpinski_def (fractal* f) {
 	f->ymin = -0.9000520021;  // Corrigé : ymin doit être < ymax
 	f->ymax = 1.700052002;     // Corrigé : ymax doit être > ymin
 	f->bailout= 127;
-	f->iterationMax= 149;
+	f->iterationMax= 1862;
 	f->zoomfactor = 4;
 }
 
@@ -1443,7 +1349,7 @@ void Barnsley1j_def (fractal* f) {
 	f->ymax = 3;
 	f->seed = MakeComplex (1.1,0.6);
 	f->bailout= 4;
-	f->iterationMax= 50;
+	f->iterationMax= 625;
 	f->zoomfactor = 4;
 }
 
@@ -1476,7 +1382,7 @@ void Barnsley1m_def (fractal* f) {
 	f->ymin = -2;
 	f->ymax = 2;
 	f->bailout= 4;
-	f->iterationMax= 150;
+	f->iterationMax= 1875;
 	f->zoomfactor = 8;
 }
 
@@ -1507,7 +1413,7 @@ void Magnet1j_def (fractal* f) {
 	f->ymin = -2;
 	f->ymax = 2;
 	f->bailout= 4;
-	f->iterationMax= 150;
+	f->iterationMax= 1875;
 	f->zoomfactor = 4;
 }
 
@@ -1537,7 +1443,7 @@ void Magnet1m_def (fractal* f) {
 	f->ymin = -2;
 	f->ymax = 2;
 	f->bailout= 4;
-	f->iterationMax= 150;
+	f->iterationMax= 1875;
 	f->zoomfactor = 8;
 }
 
@@ -1572,7 +1478,7 @@ void BurningShip_def (fractal* f) {
 	f->ymax = 2.0;
 	f->seed = ZeroSetofComplex();
 	f->bailout= 4;
-	f->iterationMax= 150;
+	f->iterationMax= 1875;
 	f->zoomfactor = 8;
 }
 
@@ -1604,7 +1510,7 @@ void Tricorn_def (fractal* f) {
 	f->ymax = 1.5;
 	f->seed = ZeroSetofComplex();
 	f->bailout= 4;
-	f->iterationMax= 150;
+	f->iterationMax= 1875;
 	f->zoomfactor = 8;
 }
 
@@ -1638,7 +1544,7 @@ void Mandelbulb_def (fractal* f) {
 	f->ymax = 1.5;
 	f->seed = ZeroSetofComplex();
 	f->bailout= 4;
-	f->iterationMax= 150;
+	f->iterationMax= 1875;
 	f->zoomfactor = 8;
 }
 
@@ -1651,7 +1557,7 @@ void Buddhabrot_def (fractal* f) {
 	f->ymax = 1.5;
 	f->seed = ZeroSetofComplex();
 	f->bailout = 4;
-	f->iterationMax = 100;  // Plus d'itérations pour de meilleurs détails
+	f->iterationMax = 22;  // Plus d'itérations pour de meilleurs détails
 	f->zoomfactor = 4;
 }
 
@@ -1760,46 +1666,11 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 			double normalized = log(1 + density) / log(1 + maxDensity);
 
 			// Appliquer la palette selon colorMode
-			switch (f->colorMode) {
-				case 1: // Mono
-					col.r = col.g = col.b = (int)(normalized * 255);
-					break;
-				case 2: // Fire
-					if (normalized < 0.33) {
-						col.r = (int)(normalized * 3 * 255);
-						col.g = 0;
-						col.b = 0;
-					} else if (normalized < 0.66) {
-						col.r = 255;
-						col.g = (int)((normalized - 0.33) * 3 * 255);
-						col.b = 0;
-					} else {
-						col.r = 255;
-						col.g = 255;
-						col.b = (int)((normalized - 0.66) * 3 * 255);
-					}
-					break;
-				case 3: // Ocean
-					if (normalized < 0.33) {
-						col.r = 0;
-						col.g = 0;
-						col.b = (int)(normalized * 3 * 255);
-					} else if (normalized < 0.66) {
-						col.r = 0;
-						col.g = (int)((normalized - 0.33) * 3 * 255);
-						col.b = 255;
-					} else {
-						col.r = (int)((normalized - 0.66) * 3 * 255);
-						col.g = 255;
-						col.b = 255;
-					}
-					break;
-				default: // Normal (violet/bleu style Buddhabrot classique)
-					col.r = (int)(normalized * 180);
-					col.g = (int)(normalized * 100);
-					col.b = (int)(normalized * 255);
-					break;
-			}
+			// Pour Buddhabrot, on garde toujours les couleurs d'origine (violet/bleu classique)
+			// indépendamment du colorMode pour préserver l'apparence caractéristique
+			col.r = (int)(normalized * 180);
+			col.g = (int)(normalized * 100);
+			col.b = (int)(normalized * 255);
 
 			pixelRGBA(canvas, (Sint16)(i + decalageX), (Sint16)(j + decalageY),
 			          col.r, col.g, col.b, 255);
