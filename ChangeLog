@@ -1,2 +1,11 @@
+2025-01-09  Claude Code
+	* Version 0.5.1
+	* Added smooth coloring with 3 new palettes (Rainbow, SmoothFire, SmoothOcean)
+	* Added status bar showing fractal info and render time
+	* Fixed logical operator bugs (& vs &&, | vs ||)
+	* Added malloc verification
+	* Default window size changed to 800x600
 
-
+2003  Arnaud VERHILLE
+	* Version 0.5
+	* Initial release

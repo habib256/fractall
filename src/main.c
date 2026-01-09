@@ -46,7 +46,7 @@ typedef struct { // Conteneur graphique en 3 parties
 //*********************
 
 int EventFlush (SDL_Event*);
-int EventCheck (SDL_Event*, SDL_Surface *, gui *, fractal *, int*, int*, window win);
+int EventCheck (SDL_Event*, SDL_Surface *, gui *, fractal *, int*, int*, window win, Uint32* renderTime);
 
 
 // MAIN FUNCTION
@@ -62,7 +62,7 @@ main (int argc, char *argv[])
 	
 	int fullscreen = 0;		// Boolean for fullscreen or not
 	int useGui = 1;			// Boolean for gui or not
-	int screenW = 450, screenH = 400;	// Largeur et hauteur de la fenetre
+	int screenW = 800, screenH = 600;	// Largeur et hauteur de la fenetre
 	int menuH = 51;			// C'est la place que prend le gui
 	int stateH = screenH - 20;		// Place Barre d etat
 	int typeFractale = 1;		//Type de fractale par defaut
@@ -73,7 +73,8 @@ main (int argc, char *argv[])
 	fractal f;			// Allocate a new fractal.
 	gui g;			// Allocate a new gui
 	window win;		// Creation d un  nouveau conteneur
-	
+	Uint32 renderTime = 0;	// Temps de rendu en ms
+
 	int i;			//tmp
 	
 	// Gestion de la ligne de commande
@@ -164,7 +165,7 @@ main (int argc, char *argv[])
 	
 	// On initialise le menu si useGui = TRUE
 	if (useGui)
-		g = SDLGUI_Init (0, 0, win.w, win.y1, stateH, SDL_MapRGB (screen->format, 213, 214, 213), 14);	// 8 bouttons par exemple
+		g = SDLGUI_Init (0, 0, win.w, win.y1, stateH, SDL_MapRGB (screen->format, 213, 214, 213), 16);	// 16 boutons (types 1-16)
 	if (useGui)
 		SDLGUI_Draw (screen, &g);
 	
@@ -181,7 +182,7 @@ main (int argc, char *argv[])
 		VonKochDraw (screen,0,win.y1,win.w,win.y2, iteration);	// Trace de Von koch
 		break;
 		
-    case 2:		
+    case 2:
 		DragonFractDraw (screen,0,win.y1,win.w,win.y2, iteration);	// Trace du Dragon
 		break;
     default:
@@ -198,7 +199,7 @@ main (int argc, char *argv[])
 		EventFlush (&event);	// Event when Initializing
 		while (SDL_WaitEvent (&event) >= 0)
 		{
-			EventCheck (&event, screen, &g, &f, &typeFractale, &iteration,win);
+			EventCheck (&event, screen, &g, &f, &typeFractale, &iteration, win, &renderTime);
 		}
     }
 	return 1;			// Error, should never reach this line !
@@ -219,8 +220,9 @@ EventFlush (SDL_Event* event)
 }
 
 int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
-				int* typeFractale, int* iteration, window win)
-{	
+				int* typeFractale, int* iteration, window win, Uint32* renderTime)
+{
+	double centerX, centerY;
 	switch (event->type)
     {
 		
@@ -229,7 +231,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 		
     case SDL_KEYDOWN:
 		{
-			if ((event->key.keysym.sym == SDLK_ESCAPE) | (event->key.keysym.sym ==
+			if ((event->key.keysym.sym == SDLK_ESCAPE) || (event->key.keysym.sym ==
 				SDLK_q))
 			{
 				// Shutdown All System
@@ -251,7 +253,25 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					printf ("Screenshot.bmp file saved successfully\n");
 				}
 			}
-			
+			if (event->key.keysym.sym == SDLK_c)
+			{			// Changer palette de couleur
+				const char* palettes[] = {"Normal", "Mono", "Fire", "Ocean", "Rainbow", "SmoothFire", "SmoothOcean"};
+				f->colorMode = (f->colorMode + 1) % 7;
+				printf ("Palette: %s\n", palettes[f->colorMode]);
+				if (*typeFractale >= 3) {
+					if (*typeFractale == 16) {
+						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+					} else {
+						Fractal_CalculateColorMatrix(f);
+						*renderTime = Fractal_Draw (screen, *f, 0, win.y1);
+					}
+					centerX = (f->xmin + f->xmax) / 2;
+					centerY = (f->ymin + f->ymax) / 2;
+					if (g != NULL)
+						SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
+				}
+			}
+
 			if (event->key.keysym.sym == SDLK_F1)
 			{
 				*typeFractale =1;
@@ -270,37 +290,81 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			{
 				*typeFractale = 3;
 				Fractal_ChangeType (f, 3);
-				Fractal_Draw (screen, *f, 0,win.y1);
+				*renderTime = Fractal_Draw (screen, *f, 0,win.y1);
+				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
 			}
 			if (event->key.keysym.sym == SDLK_F4)
 			{
 				*typeFractale = 4;
 				Fractal_ChangeType (f, 4);
-				Fractal_Draw (screen, *f,0, win.y1);
+				*renderTime = Fractal_Draw (screen, *f,0, win.y1);
+				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
 			}
 			if (event->key.keysym.sym == SDLK_F5)
 			{
 				*typeFractale = 5;
 				Fractal_ChangeType (f, 5);
-				Fractal_Draw (screen, *f, 0,win.y1);
+				*renderTime = Fractal_Draw (screen, *f, 0,win.y1);
+				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
 			}
 			if (event->key.keysym.sym == SDLK_F6)
 			{
 				*typeFractale = 6;
 				Fractal_ChangeType (f, 6);
-				Fractal_Draw (screen, *f, 0,win.y1);
+				*renderTime = Fractal_Draw (screen, *f, 0,win.y1);
+				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
 			}
 			if (event->key.keysym.sym == SDLK_F7)
 			{
 				*typeFractale = 7;
 				Fractal_ChangeType (f, 7);
-				Fractal_Draw (screen, *f, 0,win.y1);
+				*renderTime = Fractal_Draw (screen, *f, 0,win.y1);
+				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
 			}
 			if (event->key.keysym.sym == SDLK_F8)
 			{
 				*typeFractale = 8;
 				Fractal_ChangeType (f, 8);
-				Fractal_Draw (screen, *f, 0,win.y1);
+				*renderTime = Fractal_Draw (screen, *f, 0,win.y1);
+				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
+			}
+			if (event->key.keysym.sym == SDLK_F9)
+			{
+				*typeFractale = 13;
+				Fractal_ChangeType (f, 13);
+				*renderTime = Fractal_Draw (screen, *f, 0,win.y1);
+				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
+			}
+			if (event->key.keysym.sym == SDLK_F10)
+			{
+				*typeFractale = 14;
+				Fractal_ChangeType (f, 14);
+				*renderTime = Fractal_Draw (screen, *f, 0,win.y1);
+				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
+			}
+			if (event->key.keysym.sym == SDLK_F11)
+			{
+				*typeFractale = 15;
+				Fractal_ChangeType (f, 15);
+				*renderTime = Fractal_Draw (screen, *f, 0,win.y1);
+				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
+			}
+			if (event->key.keysym.sym == SDLK_F12)
+			{
+				*typeFractale = 16;
+				Fractal_ChangeType (f, 16);
+				*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
 			}
 
 		}
@@ -314,7 +378,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			// Shutdown All System
 			printf ("Quit requested, quitting.\n");
 			Fractal_Destroy (*f);
-			if (g == NULL)
+			if (g != NULL)
 				SDLGUI_Destroy (g);
 			SDL_FreeSurface (screen);
 			SDL_Quit ();
@@ -345,10 +409,22 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					*iteration = 4;
 					DragonFractDraw (screen,0,win.y1,win.w,win.y2, *iteration);
 					break;
+					case 16:
+					{
+					Fractal_ChangeType (f, 16);
+					*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+					centerX = (f->xmin + f->xmax) / 2;
+					centerY = (f->ymin + f->ymax) / 2;
+					SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
+					}
+					break;
 					default:
 					{
 					Fractal_ChangeType (f, *typeFractale);
-					Fractal_Draw (screen, *f, 0,win.y1);
+					*renderTime = Fractal_Draw (screen, *f, 0,win.y1);
+					centerX = (f->xmin + f->xmax) / 2;
+					centerY = (f->ymin + f->ymax) / 2;
+					SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
 					}
 					}
 					return 0;
@@ -458,9 +534,18 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 						f->xmin = newxmin;
 						f->ymin = newymin;
 					}
-					Fractal_Draw (screen, *f, 0,win.y1);
-					SDL_UpdateRect (screen, 0, 0, screen->w, screen->h);	
-					
+					// Buddhabrot utilise son propre algorithme de rendu
+					if (*typeFractale == 16) {
+						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+					} else {
+						*renderTime = Fractal_Draw (screen, *f, 0,win.y1);
+					}
+					centerX = (f->xmin + f->xmax) / 2;
+					centerY = (f->ymin + f->ymax) / 2;
+					if (g != NULL)
+						SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime);
+					SDL_UpdateRect (screen, 0, 0, screen->w, screen->h);
+
 				}
 				break;
 

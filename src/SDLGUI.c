@@ -5,9 +5,11 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include "SDLGUI.h"
 #include "VonKoch.h"
 #include "EscapeTime.h"
+#include "SDL_gfxPrimitives.h"
 
 
 gui SDLGUI_Init(int x, int y, int w, int h,int stateH, Uint32 bgcolor, int buttonNumber) {
@@ -23,7 +25,6 @@ gui SDLGUI_Init(int x, int y, int w, int h,int stateH, Uint32 bgcolor, int butto
   g.bgcolor = bgcolor;
 
   g.buttonNumber = buttonNumber;
-  g.buttonTab = (int *) malloc ((buttonNumber)* sizeof (button));
 
   g.barh = 8;  // Hauteur fixe
   g.buttonSize = g.h - (g.barh + 4) - 4;
@@ -41,7 +42,7 @@ gui SDLGUI_Init(int x, int y, int w, int h,int stateH, Uint32 bgcolor, int butto
 }
 
 void SDLGUI_Destroy(gui* g) {
-  free (g->buttonTab);
+  // Rien à libérer pour l'instant
 }
 
 int SDLGUI_ButtonNumberRead (gui* g, int x) {
@@ -49,9 +50,6 @@ int SDLGUI_ButtonNumberRead (gui* g, int x) {
   x = x - 2;
   buttonNb = (int) (x / (g->buttonSize +2));
   return buttonNb;
-}
-
-button SDLGUI_Button_Init(char* name, char* pictureLocation) {
 }
 
 void SDLGUI_Draw(SDL_Surface* screen, gui* g) {
@@ -97,6 +95,15 @@ void SDLGUI_Button_Draw (SDL_Surface* screen, gui* g, int xplace) {
   break;
   case 2:
   	DragonFractDraw (screen, xplace+2 ,4,g->buttonSize+xplace-2,g->buttonSize-1,8 );
+  break;
+  case 16:
+  {
+  	// Buddhabrot utilise son propre algorithme de rendu
+  	fractal f;
+	f = Fractal_Init (g->buttonSize-4, g->buttonSize-4, 16);
+	Buddhabrot_Draw (screen, &f, xplace+2, 4, NULL);  // NULL = pas de progression pour le bouton
+	Fractal_Destroy (f);
+  }
   break;
   default:
   {
@@ -160,5 +167,76 @@ void SDLGUI_Draw3DBox (SDL_Surface *surface, int x, int y, int w, int h, Uint32 
   SDL_FillRect(surface, &dstrect, color);
 }
 
+void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMode, double centerX, double centerY, int zoomFactor, Uint32 renderTime) {
+	const char* typeNames[] = {"", "Von Koch", "Dragon", "Mandelbrot", "Julia", "Julia Sin",
+		"Newton", "Phoenix", "Sierpinski", "Barnsley J", "Barnsley M",
+		"Magnet J", "Magnet M", "Burning Ship", "Tricorn", "Mandelbulb", "Buddhabrot"};
+	const char* paletteNames[] = {"Normal", "Mono", "Fire", "Ocean", "Rainbow", "SmoothFire", "SmoothOcean"};
+	char statusText[256];
 
+	// Redessiner la barre d'état
+	SDLGUI_StateBar_Draw(screen, g);
+
+	// Formater le texte
+	if (type >= 1 && type <= 16) {
+		snprintf(statusText, sizeof(statusText), "%s | %s | x%d | (%.3f, %.3f) | %dms",
+			typeNames[type], paletteNames[colorMode], zoomFactor, centerX, centerY, renderTime);
+	} else {
+		snprintf(statusText, sizeof(statusText), "Type %d | %s", type, paletteNames[colorMode]);
+	}
+
+	// Afficher le texte
+	stringRGBA(screen, 5, g->stateH + 5, statusText, 0, 0, 0, 255);
+
+	SDL_UpdateRect(screen, 0, g->stateH, g->w, screen->h - g->stateH);
+}
+
+void SDLGUI_StateBar_Progress (SDL_Surface* screen, gui* g, int percent, const char* task) {
+	char progressText[128];
+	int barWidth, barHeight, barX, barY;
+	int fillWidth;
+	SDL_Rect bgRect, fillRect;
+	Uint32 bgColor, fillColor, borderColor;
+
+	// Redessiner la barre d'état
+	SDLGUI_StateBar_Draw(screen, g);
+
+	// Couleurs
+	bgColor = SDL_MapRGB(screen->format, 200, 200, 200);
+	fillColor = SDL_MapRGB(screen->format, 80, 180, 80);
+	borderColor = SDL_MapRGB(screen->format, 100, 100, 100);
+
+	// Dimensions de la barre de progression
+	barHeight = 12;
+	barWidth = 200;
+	barX = g->w - barWidth - 10;
+	barY = g->stateH + 4;
+
+	// Fond de la barre
+	bgRect.x = barX;
+	bgRect.y = barY;
+	bgRect.w = barWidth;
+	bgRect.h = barHeight;
+	SDL_FillRect(screen, &bgRect, bgColor);
+
+	// Bordure
+	rectangleRGBA(screen, barX - 1, barY - 1, barX + barWidth, barY + barHeight, 100, 100, 100, 255);
+
+	// Remplissage selon le pourcentage
+	if (percent > 0) {
+		fillWidth = (barWidth * percent) / 100;
+		if (fillWidth > barWidth) fillWidth = barWidth;
+		fillRect.x = barX;
+		fillRect.y = barY;
+		fillRect.w = fillWidth;
+		fillRect.h = barHeight;
+		SDL_FillRect(screen, &fillRect, fillColor);
+	}
+
+	// Texte : tâche et pourcentage
+	snprintf(progressText, sizeof(progressText), "%s %d%%", task, percent);
+	stringRGBA(screen, 5, g->stateH + 5, progressText, 0, 0, 0, 255);
+
+	SDL_UpdateRect(screen, 0, g->stateH, g->w, screen->h - g->stateH);
+}
 

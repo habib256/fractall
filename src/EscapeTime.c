@@ -7,8 +7,10 @@ Copyleft 2001-2003 VERHILLE Arnaud
 
 #include <stdio.h>
 #include <stdlib.h>  // Pour malloc et free
+#include <math.h>     // Pour fabs()
 #include "SDL_gfxPrimitives.h"
 #include "EscapeTime.h"
+#include "SDLGUI.h"   // Pour la barre de progression
 
 // Fractal Functions
 // *****************
@@ -20,10 +22,15 @@ fractal Fractal_Init (int screenW, int screenH, int type) {
 	f.xpixel = screenW;
 	f.ypixel = screenH;
 	f.type = type;
+	f.colorMode = 0;
 	Fractal_ChangeType (&f, type);
 	f.fmatrix = (int *) malloc ((f.xpixel*f.ypixel)* sizeof (int));
 	f.zmatrix = (complex *) malloc ((f.xpixel*f.ypixel)* sizeof (complex));
 	f.cmatrix = (color *) malloc ((f.xpixel*f.ypixel)* sizeof (color));
+	if (f.fmatrix == NULL || f.zmatrix == NULL || f.cmatrix == NULL) {
+		fprintf(stderr, "Erreur allocation mémoire fractale\n");
+		exit(1);
+	}
 	return f;
 }
 
@@ -230,15 +237,200 @@ void FractalColorMonochrome (fractal* f) {
 	}
 }
 
+/* Palette Fire : noir -> rouge -> jaune -> blanc */
+void FractalColorFire (fractal* f) {
+	int i, j;
+	int iteration;
+	double t;
+	color c;
+
+	for (j = 0; j < f->ypixel; j++) {
+		for (i=0; i < f->xpixel; i++) {
+			iteration = *((f->fmatrix)+((f->xpixel*j)+i));
+			t = (double)iteration / f->iterationMax;
+			if (t < 0.33) {
+				c.r = (int)(t * 3 * 255);
+				c.g = 0;
+				c.b = 0;
+			} else if (t < 0.66) {
+				c.r = 255;
+				c.g = (int)((t - 0.33) * 3 * 255);
+				c.b = 0;
+			} else {
+				c.r = 255;
+				c.g = 255;
+				c.b = (int)((t - 0.66) * 3 * 255);
+			}
+			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
+		}
+	}
+}
+
+/* Palette Ocean : noir -> bleu -> cyan -> blanc */
+void FractalColorOcean (fractal* f) {
+	int i, j;
+	int iteration;
+	double t;
+	color c;
+
+	for (j = 0; j < f->ypixel; j++) {
+		for (i=0; i < f->xpixel; i++) {
+			iteration = *((f->fmatrix)+((f->xpixel*j)+i));
+			t = (double)iteration / f->iterationMax;
+			if (t < 0.33) {
+				c.r = 0;
+				c.g = 0;
+				c.b = (int)(t * 3 * 255);
+			} else if (t < 0.66) {
+				c.r = 0;
+				c.g = (int)((t - 0.33) * 3 * 255);
+				c.b = 255;
+			} else {
+				c.r = (int)((t - 0.66) * 3 * 255);
+				c.g = 255;
+				c.b = 255;
+			}
+			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
+		}
+	}
+}
+
+/* Calcul smooth iteration pour coloring continu */
+double Fractal_SmoothIteration(fractal* f, int i, int j) {
+	int iteration = *((f->fmatrix)+((f->xpixel*j)+i));
+	complex z = *((f->zmatrix)+((f->xpixel*j)+i));
+	double mag = Magz(z);
+
+	if (iteration >= f->iterationMax || mag < 1.0) {
+		return (double)iteration / f->iterationMax;
+	}
+
+	// Formule smooth coloring
+	double log_zn = log(mag) / 2.0;
+	double nu = log(log_zn / log(2.0)) / log(2.0);
+	double smooth = iteration + 1 - nu;
+
+	return smooth / f->iterationMax;
+}
+
+/* Conversion HSV vers RGB */
+color HSVtoRGB(double h, double s, double v) {
+	color c;
+	double r, g, b;
+	int i;
+	double f, p, q, t;
+
+	if (s == 0) {
+		r = g = b = v;
+	} else {
+		h = fmod(h, 360.0);
+		if (h < 0) h += 360.0;
+		h /= 60.0;
+		i = (int)floor(h);
+		f = h - i;
+		p = v * (1 - s);
+		q = v * (1 - s * f);
+		t = v * (1 - s * (1 - f));
+
+		switch (i) {
+			case 0: r = v; g = t; b = p; break;
+			case 1: r = q; g = v; b = p; break;
+			case 2: r = p; g = v; b = t; break;
+			case 3: r = p; g = q; b = v; break;
+			case 4: r = t; g = p; b = v; break;
+			default: r = v; g = p; b = q; break;
+		}
+	}
+
+	c.r = (int)(r * 255);
+	c.g = (int)(g * 255);
+	c.b = (int)(b * 255);
+	c.a = 255;
+	return c;
+}
+
+/* Palette Rainbow : arc-en-ciel HSV avec smooth coloring */
+void FractalColorRainbow(fractal* f) {
+	int i, j;
+	double t;
+
+	for (j = 0; j < f->ypixel; j++) {
+		for (i = 0; i < f->xpixel; i++) {
+			t = Fractal_SmoothIteration(f, i, j);
+			// Cycle de couleurs (multiple de 360 pour répétition)
+			*((f->cmatrix)+((f->xpixel*j)+i)) = HSVtoRGB(t * 360 * 3, 0.8, 1.0 - t * 0.3);
+		}
+	}
+}
+
+/* Palette Smooth Fire : version fluide de Fire */
+void FractalColorSmoothFire(fractal* f) {
+	int i, j;
+	double t;
+	color c;
+
+	for (j = 0; j < f->ypixel; j++) {
+		for (i = 0; i < f->xpixel; i++) {
+			t = Fractal_SmoothIteration(f, i, j);
+			if (t < 0.33) {
+				c.r = (int)(t * 3 * 255);
+				c.g = 0;
+				c.b = 0;
+			} else if (t < 0.66) {
+				c.r = 255;
+				c.g = (int)((t - 0.33) * 3 * 255);
+				c.b = 0;
+			} else {
+				c.r = 255;
+				c.g = 255;
+				c.b = (int)((t - 0.66) * 3 * 255);
+			}
+			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
+		}
+	}
+}
+
+/* Palette Smooth Ocean : version fluide de Ocean */
+void FractalColorSmoothOcean(fractal* f) {
+	int i, j;
+	double t;
+	color c;
+
+	for (j = 0; j < f->ypixel; j++) {
+		for (i = 0; i < f->xpixel; i++) {
+			t = Fractal_SmoothIteration(f, i, j);
+			if (t < 0.33) {
+				c.r = 0;
+				c.g = 0;
+				c.b = (int)(t * 3 * 255);
+			} else if (t < 0.66) {
+				c.r = 0;
+				c.g = (int)((t - 0.33) * 3 * 255);
+				c.b = 255;
+			} else {
+				c.r = (int)((t - 0.66) * 3 * 255);
+				c.g = 255;
+				c.b = 255;
+			}
+			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
+		}
+	}
+}
+
 /* Selection du mode de couleur */
 //**********************************
 
 void Fractal_CalculateColorMatrix (fractal* f) {
-
-	//FractalColorMonochrome (f);
-	FractalColorNormal (f);
-	//FractalColorTest (f);
-
+	switch (f->colorMode) {
+		case 0: FractalColorNormal(f); break;
+		case 1: FractalColorMonochrome(f); break;
+		case 2: FractalColorFire(f); break;
+		case 3: FractalColorOcean(f); break;
+		case 4: FractalColorRainbow(f); break;
+		case 5: FractalColorSmoothFire(f); break;
+		case 6: FractalColorSmoothOcean(f); break;
+		default: FractalColorNormal(f);
+	}
 }
 
 color Fractal_ReadColorMatrix (fractal f, int i, int j) {
@@ -258,17 +450,17 @@ int Fractal_ReadColorMatrixGreen (fractal f, int i, int j) {
 
 
 
-void Fractal_Draw (SDL_Surface *canvas, fractal myfractal,int decalageX,int decalageY) {
-	
+Uint32 Fractal_Draw (SDL_Surface *canvas, fractal myfractal,int decalageX,int decalageY) {
+
 	int i, j;
 	Uint8 r, g, b;
 	Uint32 time; // Test de temps de calcul en ms
-	
+
 	time = SDL_GetTicks();
-	
+
 	Fractal_CalculateMatrix_DDp1 (&myfractal);
 	Fractal_CalculateColorMatrix (&myfractal);
-	
+
 	//Draw Demi-Fractal to the SDL_Buffer and colorize it
 	for (i=0; i<myfractal.xpixel; i++) {
 		for (j=0; j<myfractal.ypixel; j++) {
@@ -282,7 +474,7 @@ void Fractal_Draw (SDL_Surface *canvas, fractal myfractal,int decalageX,int deca
 
 	Fractal_CalculateMatrix_DDp2 (&myfractal);
 	Fractal_CalculateColorMatrix (&myfractal);
-	
+
 	//Draw last Demi-Fractal to the SDL_Buffer and colorize it
 	for (i=0; i<myfractal.xpixel; i++) {
 		for (j=0; j<myfractal.ypixel; j++) {
@@ -295,6 +487,7 @@ void Fractal_Draw (SDL_Surface *canvas, fractal myfractal,int decalageX,int deca
 	SDL_UpdateRect (canvas, 0, 0, canvas->w, canvas->h);
 	time = SDL_GetTicks() - time;
 	printf ("Time Elapsed : %d ms\n", time);
+	return time;
 }
 
 void Fractal_ChangeType (fractal* f, int type) {
@@ -333,6 +526,18 @@ void Fractal_ChangeType (fractal* f, int type) {
 	case 12:
 	Magnet1m_def (f);
 	break;
+	case 13:
+	BurningShip_def (f);
+	break;
+	case 14:
+	Tricorn_def (f);
+	break;
+	case 15:
+	Mandelbulb_def (f);
+	break;
+	case 16:
+	Buddhabrot_def (f);
+	break;
 	default:
 	Mendelbrot_def (f);
 	}
@@ -355,7 +560,7 @@ fractalresult Mendelbrot_Iteration (fractal f, complex zPixel) {
 		i++;
 		zTemp = Mulz (z,z); // z(n)^2
 		z = Addz (zTemp, zPixel); //Ajout de pixel
-	} while ((i < f.iterationMax) & ( Magz (z) < f.bailout));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
 
 	result.iteration = i;
 	result.z = z;
@@ -386,7 +591,7 @@ fractalresult Julia_Iteration ( fractal f, complex zPixel) {
 		i++;
 		zTemp = Mulz (z,z); // z(n)^2
 		z = Addz (zTemp, f.seed); // ajout de seed
-	} while ((i < f.iterationMax) & ( Magz (z) < f.bailout));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
 	result.iteration = i;
 	result.z = z;
 	return result;
@@ -419,7 +624,7 @@ fractalresult JuliaSin_Iteration ( fractal f, complex zPixel) {
 	do {
 		i++;
 		z = Mulz(f.seed, sinz (z));
-	} while ((i < f.iterationMax) & ( Magz (z) < f.bailout));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
 	result.iteration = i;
 	result.z = z;
 	return result;
@@ -456,7 +661,7 @@ fractalresult Newton_Iteration ( fractal f, complex zPixel) {
 		zNum = Addz ((Mulz(MakeComplex(p-1, 0.0),Powz(z,MakeComplex(p, 0.0)))),MakeComplex(1.0, 0.0));
 		zQuot = Mulz (Powz (z, MakeComplex (p-1,0.0)),MakeComplex(p, 0.0));
 		z = Divz (zNum, zQuot);
-	} while ((i < f.iterationMax) & ( Magz (z) < f.bailout));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
 	result.iteration = i;
 	result.z = z;
 	return result;
@@ -506,7 +711,7 @@ fractalresult Phoenix_Iteration ( fractal f, complex zPixel) {
 		y = z;
 		z = zTemp;
 		}
-	} while ((i < f.iterationMax) & ( Magz (z) < f.bailout));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
 	result.iteration = i;
 	result.z = z;
 	return result;
@@ -547,7 +752,7 @@ fractalresult Sierpinski_Iteration (fractal f, complex zPixel) {
 				z = MakeComplex (2*Rez(z),2*Imz(z));
 			}
 		}
-	} while ((i < f.iterationMax) & ( Magz (z) < f.bailout));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
 	result.iteration = i;
 	result.z = z;
 	return result;
@@ -584,7 +789,7 @@ fractalresult Barnsley1j_Iteration ( fractal f, complex zPixel) {
 		zTemp = MakeComplex((Rez (z) + 1),Imz(z));
 		z = Mulz (zTemp, f.seed);
 		}
-	} while ((i < f.iterationMax) & ( Magz (z) < f.bailout));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
 	result.iteration = i;
 	result.z = z;
 	return result;
@@ -618,7 +823,7 @@ fractalresult Barnsley1m_Iteration ( fractal f, complex zPixel) {
 		zTemp = MakeComplex((Rez (z) + 1),Imz(z));
 		z = Mulz (zTemp, c);
 		}
-	} while ((i < f.iterationMax) & ( Magz (z) < f.bailout));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
 	result.iteration = i;
 	result.z = z;
 	return result;
@@ -648,7 +853,7 @@ fractalresult Magnet1j_Iteration ( fractal f, complex zPixel) {
 		N= Mulz(N,N);
 		Q= Addz(Mulz(MakeComplex(2,0),z),MakeComplex (Rez(f.seed)-2,Imz(f.seed)));
 		z = Divz(N,Q);
-	} while ((i < f.iterationMax) & ( Magz (z) < f.bailout));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
 	result.iteration = i;
 	result.z = z;
 	return result;
@@ -679,7 +884,7 @@ fractalresult Magnet1m_Iteration ( fractal f, complex zPixel) {
 		N= Mulz(N,N);
 		Q= Addz(Mulz(MakeComplex(2,0),z),MakeComplex (Rez(c)-2,Imz(c)));
 		z = Divz(N,Q);
-	} while ((i < f.iterationMax) & ( Magz (z) < f.bailout));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
 	result.iteration = i;
 	result.z = z;
 	return result;
@@ -693,6 +898,281 @@ void Magnet1m_def (fractal* f) {
 	f->bailout= 4;
 	f->iterationMax= 150;
 	f->zoomfactor = 8;
+}
+
+/* Calcul de Burning Ship */
+fractalresult BurningShip_Iteration (fractal f, complex zPixel) {
+	int i=0;
+	complex z;
+	fractalresult result;
+	
+	z = f.seed;
+	do {
+		complex zTemp;
+		double re, im;
+		i++;
+		// z(n+1) = (|Re(z)| + i|Im(z)|)² + c
+		re = fabs(Rez(z));
+		im = fabs(Imz(z));
+		zTemp = MakeComplex(re, im);
+		zTemp = Mulz(zTemp, zTemp); // (|Re(z)| + i|Im(z)|)²
+		z = Addz(zTemp, zPixel); // Ajout de pixel
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
+	
+	result.iteration = i;
+	result.z = z;
+	return result;
+}
+void BurningShip_def (fractal* f) {
+	/* Valeurs de base pour Burning Ship */
+	f->xmin = -2.5;
+	f->xmax = 1.5;
+	f->ymin = -2.0;
+	f->ymax = 2.0;
+	f->seed = ZeroSetofComplex();
+	f->bailout= 4;
+	f->iterationMax= 150;
+	f->zoomfactor = 8;
+}
+
+/* Calcul de Tricorn */
+fractalresult Tricorn_Iteration (fractal f, complex zPixel) {
+	int i=0;
+	complex z;
+	fractalresult result;
+	
+	z = f.seed;
+	do {
+		complex zTemp, zConj;
+		i++;
+		// z(n+1) = (conjugué(z))² + c
+		zConj = MakeComplex(Rez(z), -Imz(z)); // Conjugué
+		zTemp = Mulz(zConj, zConj); // (conjugué(z))²
+		z = Addz(zTemp, zPixel); // Ajout de pixel
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
+	
+	result.iteration = i;
+	result.z = z;
+	return result;
+}
+void Tricorn_def (fractal* f) {
+	/* Valeurs de base pour Tricorn */
+	f->xmin = -2.5;
+	f->xmax = 1.5;
+	f->ymin = -1.5;
+	f->ymax = 1.5;
+	f->seed = ZeroSetofComplex();
+	f->bailout= 4;
+	f->iterationMax= 150;
+	f->zoomfactor = 8;
+}
+
+/* Calcul de Mandelbulb (version 2D avec puissance 8) */
+fractalresult Mandelbulb_Iteration (fractal f, complex zPixel) {
+	int i=0;
+	complex z;
+	fractalresult result;
+	
+	z = f.seed;
+	do {
+		complex zTemp;
+		i++;
+		// z(n+1) = z(n)^8 + c
+		// Calcul de z^8 par multiplications successives
+		zTemp = Mulz(z, z);      // z^2
+		zTemp = Mulz(zTemp, zTemp); // z^4
+		zTemp = Mulz(zTemp, zTemp); // z^8
+		z = Addz(zTemp, zPixel); // z^8 + c
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
+	
+	result.iteration = i;
+	result.z = z;
+	return result;
+}
+void Mandelbulb_def (fractal* f) {
+	/* Valeurs de base pour Mandelbulb */
+	f->xmin = -1.5;
+	f->xmax = 1.5;
+	f->ymin = -1.5;
+	f->ymax = 1.5;
+	f->seed = ZeroSetofComplex();
+	f->bailout= 4;
+	f->iterationMax= 150;
+	f->zoomfactor = 8;
+}
+
+/* Buddhabrot - algorithme de densité par trajectoires */
+void Buddhabrot_def (fractal* f) {
+	/* Valeurs de base pour Buddhabrot */
+	f->xmin = -2.5;
+	f->xmax = 1.5;
+	f->ymin = -1.5;
+	f->ymax = 1.5;
+	f->seed = ZeroSetofComplex();
+	f->bailout = 4;
+	f->iterationMax = 100;  // Plus d'itérations pour de meilleurs détails
+	f->zoomfactor = 4;
+}
+
+/* Fonction de rendu spéciale pour Buddhabrot */
+Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decalageY, void* guiPtr) {
+	int i, j, iter;
+	int px, py;
+	double xg, yg;
+	complex c, z;
+	Uint32 time;
+	int numSamples;
+	double maxDensity;
+	color col;
+	int lastPercent = -1;
+	int progressInterval;
+
+	// Tableaux pour stocker la trajectoire
+	double *trajX, *trajY;
+
+	time = SDL_GetTicks();
+
+	printf("Calculating Buddhabrot (density algorithm)...\n");
+
+	// Allouer mémoire pour trajectoire
+	trajX = (double*) malloc(f->iterationMax * sizeof(double));
+	trajY = (double*) malloc(f->iterationMax * sizeof(double));
+	if (trajX == NULL || trajY == NULL) {
+		fprintf(stderr, "Erreur allocation mémoire trajectoire\n");
+		return 0;
+	}
+
+	// Réinitialiser la matrice de densité (on utilise fmatrix)
+	for (i = 0; i < f->xpixel * f->ypixel; i++) {
+		f->fmatrix[i] = 0;
+	}
+
+	// Nombre d'échantillons proportionnel à la surface
+	numSamples = f->xpixel * f->ypixel * 50;
+
+	// Intervalle de mise à jour de la progression (tous les 1%)
+	progressInterval = numSamples / 100;
+	if (progressInterval < 1) progressInterval = 1;
+
+	// Echantillonnage aléatoire
+	srand(42);  // Seed fixe pour reproductibilité
+
+	for (int sample = 0; sample < numSamples; sample++) {
+		// Mise à jour de la progression
+		if (guiPtr != NULL && (sample % progressInterval == 0)) {
+			int percent = (sample * 100) / numSamples;
+			if (percent != lastPercent) {
+				SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, "Buddhabrot");
+				lastPercent = percent;
+			}
+		}
+
+		// Générer un point c aléatoire dans la zone
+		xg = ((double)rand() / RAND_MAX) * (f->xmax - f->xmin) + f->xmin;
+		yg = ((double)rand() / RAND_MAX) * (f->ymax - f->ymin) + f->ymin;
+		c = MakeComplex(xg, yg);
+		z = ZeroSetofComplex();
+
+		// Itérer et stocker la trajectoire
+		int escaped = 0;
+		for (iter = 0; iter < f->iterationMax; iter++) {
+			complex zTemp = Mulz(z, z);
+			z = Addz(zTemp, c);
+
+			trajX[iter] = Rez(z);
+			trajY[iter] = Imz(z);
+
+			if (Magz(z) > f->bailout) {
+				escaped = 1;
+				break;
+			}
+		}
+
+		// Si le point s'échappe, tracer sa trajectoire
+		if (escaped) {
+			for (i = 0; i < iter; i++) {
+				// Convertir coordonnées complexes en pixels
+				px = (int)((trajX[i] - f->xmin) / (f->xmax - f->xmin) * f->xpixel);
+				py = (int)((trajY[i] - f->ymin) / (f->ymax - f->ymin) * f->ypixel);
+
+				// Vérifier les limites et incrémenter la densité
+				if (px >= 0 && px < f->xpixel && py >= 0 && py < f->ypixel) {
+					f->fmatrix[py * f->xpixel + px]++;
+				}
+			}
+		}
+	}
+
+	// Trouver la densité maximale pour normalisation
+	maxDensity = 1;
+	for (i = 0; i < f->xpixel * f->ypixel; i++) {
+		if (f->fmatrix[i] > maxDensity) {
+			maxDensity = f->fmatrix[i];
+		}
+	}
+
+	// Convertir densité en couleurs et afficher
+	for (j = 0; j < f->ypixel; j++) {
+		for (i = 0; i < f->xpixel; i++) {
+			double density = (double)f->fmatrix[j * f->xpixel + i];
+			// Utiliser une échelle logarithmique pour mieux voir les détails
+			double normalized = log(1 + density) / log(1 + maxDensity);
+
+			// Appliquer la palette selon colorMode
+			switch (f->colorMode) {
+				case 1: // Mono
+					col.r = col.g = col.b = (int)(normalized * 255);
+					break;
+				case 2: // Fire
+					if (normalized < 0.33) {
+						col.r = (int)(normalized * 3 * 255);
+						col.g = 0;
+						col.b = 0;
+					} else if (normalized < 0.66) {
+						col.r = 255;
+						col.g = (int)((normalized - 0.33) * 3 * 255);
+						col.b = 0;
+					} else {
+						col.r = 255;
+						col.g = 255;
+						col.b = (int)((normalized - 0.66) * 3 * 255);
+					}
+					break;
+				case 3: // Ocean
+					if (normalized < 0.33) {
+						col.r = 0;
+						col.g = 0;
+						col.b = (int)(normalized * 3 * 255);
+					} else if (normalized < 0.66) {
+						col.r = 0;
+						col.g = (int)((normalized - 0.33) * 3 * 255);
+						col.b = 255;
+					} else {
+						col.r = (int)((normalized - 0.66) * 3 * 255);
+						col.g = 255;
+						col.b = 255;
+					}
+					break;
+				default: // Normal (violet/bleu style Buddhabrot classique)
+					col.r = (int)(normalized * 180);
+					col.g = (int)(normalized * 100);
+					col.b = (int)(normalized * 255);
+					break;
+			}
+
+			pixelRGBA(canvas, (Sint16)(i + decalageX), (Sint16)(j + decalageY),
+			          col.r, col.g, col.b, 255);
+		}
+	}
+
+	SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
+
+	free(trajX);
+	free(trajY);
+
+	time = SDL_GetTicks() - time;
+	printf("Buddhabrot rendered in %d ms (%d samples)\n", time, numSamples);
+	return time;
 }
 
 // Selectionne la formule
@@ -729,6 +1209,15 @@ fractalresult FormulaSelector (fractal f, complex zPixel) {
 	break;
 	case 12:
 	r=Magnet1m_Iteration (f,zPixel);
+	break;
+	case 13:
+	r=BurningShip_Iteration (f,zPixel);
+	break;
+	case 14:
+	r=Tricorn_Iteration (f,zPixel);
+	break;
+	case 15:
+	r=Mandelbulb_Iteration (f,zPixel);
 	break;
 
 	}
