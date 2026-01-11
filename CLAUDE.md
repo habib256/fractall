@@ -10,7 +10,7 @@ Visualiseur de fractales portable en C utilisant SDL.
 
 ```bash
 ./autogen.sh      # Si configure n'existe pas
-./configure
+./configure       # --with-gmp pour activer la haute précision
 make
 ./src/fractall
 ```
@@ -18,7 +18,8 @@ make
 ### Dépendances
 
 - SDL 1.2.0+
-- Bibliothèque mathématique standard (`-lm`)
+- Bibliothèque mathématique (`-lm`)
+- GMP (optionnel) : précision arbitraire pour zooms profonds
 
 ## Utilisation
 
@@ -28,118 +29,89 @@ fractall [OPTIONS]
 
 | Option | Description | Défaut |
 |--------|-------------|--------|
-| `-x<n>` | Largeur de la fenêtre | 800 |
-| `-y<n>` | Hauteur de la fenêtre | 600 |
-| `-f` | Mode plein écran | - |
-| `-g<n>` | Hauteur du GUI | 51 |
-| `-nogui` | Désactiver l'interface graphique | - |
-| `-h`, `-help` | Afficher l'aide | - |
+| `-x<n>` | Largeur fenêtre | 800 |
+| `-y<n>` | Hauteur fenêtre | 600 |
+| `-f` | Plein écran | - |
+| `-g<n>` | Hauteur GUI | 51 |
+| `-nogui` | Sans interface | - |
+| `-h` | Aide | - |
 
 ### Contrôles
 
-| Touche/Action | Effet |
-|---------------|-------|
-| **F1** | Von Koch |
-| **F2** | Dragon Fractal |
-| **F3** | Mandelbrot |
-| **F4** | Julia |
-| **F5** | Julia Sin |
-| **F6** | Newton |
-| **F7** | Phoenix |
-| **F8** | Sierpinski |
-| **F9** | Burning Ship |
-| **F10** | Tricorn |
-| **F11** | Mandelbulb (2D, puissance 8) |
-| **F12** | Buddhabrot |
+| Touche | Effet |
+|--------|-------|
+| **F1-F8** | Von Koch, Dragon, Mandelbrot, Julia, Julia Sin, Newton, Phoenix, Sierpinski |
+| **F9-F12** | Burning Ship, Tricorn, Mandelbulb, Buddhabrot |
 | **Clic gauche** | Zoom / +1 itération (vectorielles) |
-| **Clic droit** | Dézoom / -1 itération (vectorielles) |
-| **C** | Changer de palette de couleurs |
-| **S** | Capture d'écran (Screenshot.bmp) |
-| **Q** / **ESC** | Quitter |
+| **Clic droit** | Dézoom / -1 itération |
+| **C** | Changer palette |
+| **S** | Screenshot (Screenshot.bmp) |
+| **Q/ESC** | Quitter |
 
 ## Architecture
 
 ```
-fractall/
-├── src/                    # Code source
-│   ├── main.c              # Point d'entrée, boucle événements
-│   ├── EscapeTime.[ch]     # Fractales temps d'échappement
-│   ├── VonKoch.[ch]        # Fractales vectorielles
-│   ├── SDLGUI.[ch]         # Interface utilisateur
-│   ├── complexmath.[ch]    # Arithmétique complexe
-│   ├── exception.[ch]      # Gestion d'exceptions
-│   └── SDL_gfx*            # Primitives graphiques SDL
-├── docs/                   # Documentation
-├── configure.ac            # Configuration autotools
-└── Makefile.am             # Build automake
+src/
+├── main.c           # Point d'entrée, événements
+├── EscapeTime.[ch]  # Fractales escape-time
+├── VonKoch.[ch]     # Fractales vectorielles
+├── SDLGUI.[ch]      # Interface graphique
+├── complexmath.[ch] # Arithmétique complexe
+├── complexmath_gmp.[ch] # Arithmétique GMP (optionnel)
+├── precision_detector.[ch] # Détection précision GMP
+└── SDL_gfx*         # Primitives graphiques
 ```
 
 ## Types de fractales
 
-### Fractales vectorielles (récursives)
+### Vectorielles (récursives) - Types 1-2
 
 | Type | Nom | Itérations max |
 |------|-----|----------------|
 | 1 | Von Koch | 8 |
-| 2 | Dragon Fractal | 20 |
+| 2 | Dragon | 20 |
 
-Implémentées dans `VonKoch.c` avec tracé récursif.
-
-### Fractales temps d'échappement
+### Escape-time - Types 3-16
 
 | Type | Nom | Formule |
 |------|-----|---------|
 | 3 | Mandelbrot | z(n+1) = z(n)² + c |
 | 4 | Julia | z(n+1) = z(n)² + seed |
-| 5 | Julia Sin | z(n+1) = c * sin(z(n)) |
-| 6 | Newton | z(n+1) = ((p-1)*z^p + 1) / (p*z^(p-1)) |
-| 7 | Phoenix | z(n+1) = z(n)² + p1 + p2*y(n) |
+| 5 | Julia Sin | z(n+1) = c × sin(z(n)) |
+| 6 | Newton | z(n+1) = ((p-1)×z^p + 1) / (p×z^(p-1)) |
+| 7 | Phoenix | z(n+1) = z(n)² + p1 + p2×y(n) |
 | 8 | Sierpinski | Transformation conditionnelle |
-| 9 | Barnsley J1 | z(n+1) = (z±1)*c selon Re(z) |
-| 10 | Barnsley M1 | Variante Mandelbrot de Barnsley |
-| 11 | Magnet J1 | Formule magnétique (Julia) |
-| 12 | Magnet M1 | Formule magnétique (Mandelbrot) |
+| 9 | Barnsley J | z(n+1) = (z±1)×c selon Re(z) |
+| 10 | Barnsley M | Variante Mandelbrot de Barnsley |
+| 11 | Magnet J | Formule magnétique (Julia) |
+| 12 | Magnet M | Formule magnétique (Mandelbrot) |
 | 13 | Burning Ship | z(n+1) = (\|Re(z)\| + i\|Im(z)\|)² + c |
 | 14 | Tricorn | z(n+1) = conj(z)² + c |
 | 15 | Mandelbulb | z(n+1) = z(n)⁸ + c |
 | 16 | Buddhabrot | Densité des trajectoires d'échappement |
 
-### Buddhabrot (algorithme de densité)
+**Note** : F9-F12 mappent vers les types 13-16 (les types 9-12 sont accessibles via GUI).
 
-La Buddhabrot utilise un algorithme différent des autres fractales :
-1. Échantillonnage aléatoire de points dans le plan complexe
-2. Pour chaque point qui s'échappe (n'est PAS dans Mandelbrot), on trace sa trajectoire
-3. On incrémente un compteur de densité pour chaque pixel traversé
-4. La couleur finale est basée sur la densité (échelle logarithmique)
+### Buddhabrot
 
-Cet algorithme révèle la "probabilité" qu'un point soit traversé par une trajectoire d'échappement, créant une image ressemblant à un Bouddha méditant.
+Algorithme de densité différent :
+1. Échantillonnage aléatoire du plan complexe
+2. Trace les trajectoires des points qui s'échappent
+3. Incrémente un compteur de densité par pixel traversé
+4. Couleur finale basée sur densité (échelle log)
 
 ## Palettes de couleurs
 
-7 palettes disponibles (touche **C** pour cycler) :
+2 palettes disponibles (touche **C**) :
 
 | Mode | Description |
 |------|-------------|
-| Normal | Gradient arc-en-ciel (R, G, B cycliques) |
-| Mono | Niveaux de gris |
-| Fire | Noir → Rouge → Jaune → Blanc |
-| Ocean | Noir → Bleu → Cyan → Blanc |
-| Rainbow | Arc-en-ciel HSV avec smooth coloring |
-| SmoothFire | Fire avec dégradés fluides (sans bandes) |
-| SmoothOcean | Ocean avec dégradés fluides (sans bandes) |
+| SmoothFire | Noir → Rouge → Jaune → Blanc (dégradés fluides, répétition 4×) |
+| SmoothOcean | Noir → Bleu → Cyan → Blanc (dégradés fluides, répétition 4×) |
 
-Les palettes "Smooth" utilisent une interpolation continue basée sur |z| pour éliminer les bandes de couleur visibles.
+Les deux utilisent une interpolation continue basée sur |z| et alternent endroit/envers pour éviter les transitions brutales.
 
-## Barre d'état
-
-Affiche en bas de l'écran :
-- Type de fractale
-- Palette active
-- Facteur de zoom
-- Coordonnées du centre
-- Temps de rendu (ms)
-
-## Structures de données principales
+## Structure principale
 
 ### `fractal` (EscapeTime.h)
 
@@ -150,28 +122,43 @@ typedef struct {
   double ymin, ymax;
   complex seed;             // Paramètre c pour Julia
   int iterationMax;         // Limite d'itérations
-  int bailout;              // Seuil d'échappement
-  int zoomfactor;           // Facteur de zoom
-  int type;                 // Type de fractale (3-16)
-  int colorMode;            // Palette (0-6: Normal, Mono, Fire, Ocean, Rainbow, SmoothFire, SmoothOcean)
+  int bailout;              // Seuil d'échappement (généralement 4)
+  int zoomfactor;           // Facteur de zoom (2-8 selon fractale)
+  int type;                 // Type de fractale (1-16)
+  int colorMode;            // 0=SmoothFire, 1=SmoothOcean
   int *fmatrix;             // Matrice d'itérations
   complex *zmatrix;         // Valeurs z finales
   color *cmatrix;           // Couleurs calculées
+#ifdef HAVE_GMP
+  int use_gmp;              // Utiliser GMP (1) ou double (0)
+  mp_bitcnt_t gmp_precision; // Précision GMP en bits
+  complex_gmp *zmatrix_gmp; // Matrice GMP optionnelle
+  mpf_t xmin_gmp, xmax_gmp; // Coordonnées GMP
+  mpf_t ymin_gmp, ymax_gmp;
+#endif
 } fractal;
 ```
 
-### `gui` (SDLGUI.h)
+## Optimisation du rendu
 
-Interface avec barre de menu (16 boutons) et barre d'état.
+**Divergence Detection** en deux passes :
 
-## Algorithmes d'optimisation
+1. **DDp1** : Calcul grille 2×2, interpolation pixels intermédiaires
+2. **DDp2** : Affinage des manquants, évite calcul si 4 voisins identiques
 
-Le rendu utilise la **Divergence Detection** en deux passes :
+Permet un aperçu rapide suivi d'un rendu complet.
 
-1. **DDp1** : Calcul sur grille 2x2, interpolation des pixels intermédiaires
-2. **DDp2** : Affinage des pixels manquants, évite le calcul si les 4 voisins ont la même valeur d'itération
+## Précision GMP
 
-Cette technique permet un aperçu rapide suivi d'un rendu complet.
+Avec `--with-gmp`, le programme détecte automatiquement quand la précision double (53 bits) devient insuffisante et bascule vers GMP. La précision augmente dynamiquement avec le niveau de zoom.
+
+Fichiers clés :
+- `precision_detector.[ch]` : Détection automatique du seuil
+- `complexmath_gmp.[ch]` : Arithmétique complexe en précision arbitraire
+
+## Barre d'état
+
+Affiche : Type | Palette | Zoom | Centre (x,y) | Temps rendu (ms)
 
 ## Flux d'exécution
 
@@ -184,36 +171,20 @@ main()
   └── Boucle principale
         ├── SDL_WaitEvent()
         └── EventCheck()
-              ├── Clavier (F1-F12, S, Q)
+              ├── Clavier (F1-F12, C, S, Q)
               ├── Souris (zoom, GUI)
               └── Quit
 ```
 
-## Fichiers sources
-
-| Fichier | Description | Origine |
-|---------|-------------|---------|
-| `main.c` | Point d'entrée, gestion événements | Projet |
-| `EscapeTime.c` | Calcul des fractales escape-time | Projet |
-| `VonKoch.c` | Fractales vectorielles | Projet |
-| `SDLGUI.c` | Interface graphique | Projet |
-| `complexmath.c` | Arithmétique complexe | Akihiro Sato |
-| `exception.c` | Gestion d'exceptions | Équipe LOGIN |
-| `SDL_gfxPrimitives.c` | Primitives graphiques | SDL_gfx Team |
-| `SDL_imageFilter.c` | Filtres d'image | SDL_gfx Team |
-| `SDL_rotozoom.c` | Rotation/zoom surfaces | SDL_gfx Team |
-
 ## TODO
 
-- Réutilisation de cmatrix lors du zoom (optimisation)
+- Réutilisation de cmatrix lors du zoom
 - Export PNG avec métadonnées
 - Historique zoom (undo/redo)
-- Palettes personnalisables (fichiers de configuration)
+- Palettes personnalisables
 
-## Notes de développement
+## Notes
 
-- Les types 1-2 sont des fractales vectorielles, les types 3-16 sont des fractales escape-time
-- Les raccourcis F9-F12 mappent vers les types internes 13-16
-- Le type 16 (Buddhabrot) utilise un algorithme de densité différent via `Buddhabrot_Draw()`
-- La taille par défaut de la fenêtre est 800x600
-- Le GUI occupe 51 pixels en haut, la barre d'état 20 pixels en bas
+- GUI : 51px en haut, barre d'état : 20px en bas
+- `Buddhabrot_Draw()` pour le type 16
+- `Fractal_GetTypeName()` retourne le nom selon le type

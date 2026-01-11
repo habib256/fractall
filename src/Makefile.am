@@ -37,7 +37,9 @@ fractall_SOURCES += \
 	complexmath_gmp.c \
 	complexmath_gmp.h \
 	precision_detector.c \
-	precision_detector.h
+	precision_detector.h \
+	gmp_pool.c \
+	gmp_pool.h
 endif
 
 fractall_LDFLAGS =  -lm

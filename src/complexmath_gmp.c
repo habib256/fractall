@@ -837,11 +837,78 @@ int complex_gmp_cmp_mag(mpf_t threshold, complex_gmp z) {
     mpf_t mag;
     mp_bitcnt_t prec = mpf_get_prec(z.x);
     int result;
-    
+
     mpf_init2(mag, prec);
     complex_gmp_mag(mag, z);
     result = mpf_cmp(mag, threshold);
     mpf_clear(mag);
-    
+
     return result;
+}
+
+// ============================================================================
+// Fonctions in-place optimisées (Phase 1 - Optimisation GMP)
+// ============================================================================
+
+void gmp_mul_temps_init(gmp_mul_temps* temps, mp_bitcnt_t prec) {
+    mpf_init2(temps->t1, prec);
+    mpf_init2(temps->t2, prec);
+    mpf_init2(temps->t3, prec);
+    mpf_init2(temps->t4, prec);
+    temps->initialized = 1;
+}
+
+void gmp_mul_temps_clear(gmp_mul_temps* temps) {
+    if (temps->initialized) {
+        mpf_clear(temps->t1);
+        mpf_clear(temps->t2);
+        mpf_clear(temps->t3);
+        mpf_clear(temps->t4);
+        temps->initialized = 0;
+    }
+}
+
+void complex_gmp_add_to(complex_gmp* result, complex_gmp z1, complex_gmp z2) {
+    mpf_add(result->x, z1.x, z2.x);
+    mpf_add(result->y, z1.y, z2.y);
+}
+
+void complex_gmp_sub_to(complex_gmp* result, complex_gmp z1, complex_gmp z2) {
+    mpf_sub(result->x, z1.x, z2.x);
+    mpf_sub(result->y, z1.y, z2.y);
+}
+
+void complex_gmp_mul_to(complex_gmp* result, complex_gmp z1, complex_gmp z2, gmp_mul_temps* temps) {
+    // result.x = z1.x * z2.x - z1.y * z2.y
+    mpf_mul(temps->t1, z1.x, z2.x);
+    mpf_mul(temps->t2, z1.y, z2.y);
+    mpf_sub(result->x, temps->t1, temps->t2);
+
+    // result.y = z1.x * z2.y + z1.y * z2.x
+    mpf_mul(temps->t3, z1.x, z2.y);
+    mpf_mul(temps->t4, z1.y, z2.x);
+    mpf_add(result->y, temps->t3, temps->t4);
+}
+
+void complex_gmp_sq_to(complex_gmp* result, complex_gmp z, gmp_mul_temps* temps) {
+    // Optimisé pour z² : result.x = z.x² - z.y², result.y = 2*z.x*z.y
+    // Utilise seulement 3 multiplications au lieu de 4
+    mpf_mul(temps->t1, z.x, z.x);      // z.x²
+    mpf_mul(temps->t2, z.y, z.y);      // z.y²
+    mpf_mul(temps->t3, z.x, z.y);      // z.x * z.y
+
+    mpf_sub(result->x, temps->t1, temps->t2);  // z.x² - z.y²
+    mpf_mul_ui(result->y, temps->t3, 2);       // 2 * z.x * z.y
+}
+
+void complex_gmp_mag2_to(mpf_t result, complex_gmp z, mpf_t temp1, mpf_t temp2) {
+    // |z|² = z.x² + z.y² (sans sqrt)
+    mpf_mul(temp1, z.x, z.x);
+    mpf_mul(temp2, z.y, z.y);
+    mpf_add(result, temp1, temp2);
+}
+
+void complex_gmp_copy_to(complex_gmp* dest, complex_gmp src) {
+    mpf_set(dest->x, src.x);
+    mpf_set(dest->y, src.y);
 }

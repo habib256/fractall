@@ -93,7 +93,9 @@ am__append_1 = \
 	complexmath_gmp.c \
 	complexmath_gmp.h \
 	precision_detector.c \
-	precision_detector.h
+	precision_detector.h \
+	gmp_pool.c \
+	gmp_pool.h
 
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -114,9 +116,10 @@ am__fractall_SOURCES_DIST = main.c complexmath.c complexmath.h \
 	SDL_gfxPrimitives_font.h SDLGUI.c SDLGUI.h SDL_imageFilter.c \
 	SDL_imageFilter.h SDL_rotozoom.c SDL_rotozoom.h VonKoch.c \
 	VonKoch.h complexmath_gmp.c complexmath_gmp.h \
-	precision_detector.c precision_detector.h
+	precision_detector.c precision_detector.h gmp_pool.c \
+	gmp_pool.h
 am__objects_1 = complexmath_gmp.$(OBJEXT) \
-	precision_detector.$(OBJEXT)
+	precision_detector.$(OBJEXT) gmp_pool.$(OBJEXT)
 am_fractall_OBJECTS = main.$(OBJEXT) complexmath.$(OBJEXT) \
 	EscapeTime.$(OBJEXT) exception.$(OBJEXT) \
 	SDL_gfxPrimitives.$(OBJEXT) SDLGUI.$(OBJEXT) \
@@ -151,7 +154,8 @@ am__depfiles_remade = ./$(DEPDIR)/EscapeTime.Po ./$(DEPDIR)/SDLGUI.Po \
 	./$(DEPDIR)/SDL_imageFilter.Po ./$(DEPDIR)/SDL_rotozoom.Po \
 	./$(DEPDIR)/VonKoch.Po ./$(DEPDIR)/complexmath.Po \
 	./$(DEPDIR)/complexmath_gmp.Po ./$(DEPDIR)/exception.Po \
-	./$(DEPDIR)/main.Po ./$(DEPDIR)/precision_detector.Po
+	./$(DEPDIR)/gmp_pool.Po ./$(DEPDIR)/main.Po \
+	./$(DEPDIR)/precision_detector.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -445,6 +449,7 @@ include ./$(DEPDIR)/VonKoch.Po # am--include-marker
 include ./$(DEPDIR)/complexmath.Po # am--include-marker
 include ./$(DEPDIR)/complexmath_gmp.Po # am--include-marker
 include ./$(DEPDIR)/exception.Po # am--include-marker
+include ./$(DEPDIR)/gmp_pool.Po # am--include-marker
 include ./$(DEPDIR)/main.Po # am--include-marker
 include ./$(DEPDIR)/precision_detector.Po # am--include-marker
 
@@ -616,6 +621,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/complexmath.Po
 	-rm -f ./$(DEPDIR)/complexmath_gmp.Po
 	-rm -f ./$(DEPDIR)/exception.Po
+	-rm -f ./$(DEPDIR)/gmp_pool.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/precision_detector.Po
 	-rm -f Makefile
@@ -672,6 +678,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/complexmath.Po
 	-rm -f ./$(DEPDIR)/complexmath_gmp.Po
 	-rm -f ./$(DEPDIR)/exception.Po
+	-rm -f ./$(DEPDIR)/gmp_pool.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/precision_detector.Po
 	-rm -f Makefile

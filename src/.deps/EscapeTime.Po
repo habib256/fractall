@@ -101,8 +101,8 @@ EscapeTime.o: EscapeTime.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h \
  /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
  /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
- /usr/include/x86_64-linux-gnu/bits/uio_lim.h complexmath_gmp.h SDLGUI.h \
- precision_detector.h
+ /usr/include/x86_64-linux-gnu/bits/uio_lim.h complexmath_gmp.h \
+ gmp_pool.h SDLGUI.h precision_detector.h
 /usr/include/stdc-predef.h:
 /usr/include/stdio.h:
 /usr/include/x86_64-linux-gnu/bits/libc-header-start.h:
@@ -235,5 +235,6 @@ exception.h:
 /usr/include/x86_64-linux-gnu/bits/xopen_lim.h:
 /usr/include/x86_64-linux-gnu/bits/uio_lim.h:
 complexmath_gmp.h:
+gmp_pool.h:
 SDLGUI.h:
 precision_detector.h:

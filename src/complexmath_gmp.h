@@ -77,4 +77,24 @@ int complex_gmp_is_inf(complex_gmp z);
 int complex_gmp_is_nan(complex_gmp z);
 int complex_gmp_cmp_mag(mpf_t threshold, complex_gmp z);
 
+// Structure pour temporaires de multiplication (évite allocations répétées)
+typedef struct {
+    mpf_t t1, t2, t3, t4;
+    int initialized;
+} gmp_mul_temps;
+
+// Initialisation/destruction des temporaires
+void gmp_mul_temps_init(gmp_mul_temps* temps, mp_bitcnt_t prec);
+void gmp_mul_temps_clear(gmp_mul_temps* temps);
+
+// Opérations in-place (pas d'allocation, écrit directement dans result)
+void complex_gmp_add_to(complex_gmp* result, complex_gmp z1, complex_gmp z2);
+void complex_gmp_sub_to(complex_gmp* result, complex_gmp z1, complex_gmp z2);
+void complex_gmp_mul_to(complex_gmp* result, complex_gmp z1, complex_gmp z2, gmp_mul_temps* temps);
+void complex_gmp_sq_to(complex_gmp* result, complex_gmp z, gmp_mul_temps* temps);
+void complex_gmp_mag2_to(mpf_t result, complex_gmp z, mpf_t temp1, mpf_t temp2);
+
+// Copie in-place (sans allocation)
+void complex_gmp_copy_to(complex_gmp* dest, complex_gmp src);
+
 #endif /* COMPLEXGMPFLAG */

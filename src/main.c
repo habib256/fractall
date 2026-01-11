@@ -40,8 +40,14 @@
 #endif
 #define VERSION 0.5
 
-
-
+// Calcule le vrai facteur de zoom basé sur les coordonnées
+// Pour Mandelbrot standard: la plage initiale est environ 4.0 (de -2 à 2)
+static double calculate_zoom_factor(fractal* f) {
+	double base_range = 4.0;
+	double current_range = f->xmax - f->xmin;
+	if (current_range <= 0) return 1.0;
+	return base_range / current_range;
+}
 
 typedef struct { // Conteneur graphique en 3 parties
 	int y1, y2;
@@ -262,8 +268,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			}
 			if (event->key.keysym.sym == SDLK_c)
 			{			// Changer palette de couleur
-				const char* palettes[] = {"SmoothFire", "Rainbow", "SmoothOcean"};
-				f->colorMode = (f->colorMode + 1) % 3;
+				const char* palettes[] = {"SmoothFire", "SmoothOcean", "SmoothForest", "SmoothViolet", "SmoothRainbow"};
+				f->colorMode = (f->colorMode + 1) % 5;
 				printf ("Palette: %s\n", palettes[f->colorMode]);
 				if (*typeFractale >= 3) {
 					if (*typeFractale == 16) {
@@ -289,7 +295,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					centerX = (f->xmin + f->xmax) / 2;
 					centerY = (f->ymin + f->ymax) / 2;
 					if (g != NULL)
-						SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+						SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 				}
 			}
 
@@ -313,7 +319,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				Fractal_ChangeType (f, 3);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
-				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 			}
 			if (event->key.keysym.sym == SDLK_F4)
 			{
@@ -321,7 +327,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				Fractal_ChangeType (f, 4);
 				*renderTime = Fractal_Draw (screen, *f,0, win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
-				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 			}
 			if (event->key.keysym.sym == SDLK_F5)
 			{
@@ -329,7 +335,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				Fractal_ChangeType (f, 5);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
-				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 			}
 			if (event->key.keysym.sym == SDLK_F6)
 			{
@@ -337,7 +343,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				Fractal_ChangeType (f, 6);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
-				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 			}
 			if (event->key.keysym.sym == SDLK_F7)
 			{
@@ -345,7 +351,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				Fractal_ChangeType (f, 7);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
-				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 			}
 			if (event->key.keysym.sym == SDLK_F8)
 			{
@@ -353,7 +359,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				Fractal_ChangeType (f, 8);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
-				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 			}
 			if (event->key.keysym.sym == SDLK_F9)
 			{
@@ -361,7 +367,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				Fractal_ChangeType (f, 13);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
-				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 			}
 			if (event->key.keysym.sym == SDLK_F10)
 			{
@@ -369,7 +375,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				Fractal_ChangeType (f, 14);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
-				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 			}
 			if (event->key.keysym.sym == SDLK_F11)
 			{
@@ -377,7 +383,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				Fractal_ChangeType (f, 15);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
-				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 			}
 			if (event->key.keysym.sym == SDLK_F12)
 			{
@@ -385,7 +391,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				Fractal_ChangeType (f, 16);
 				*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
-				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 			}
 
 		}
@@ -436,7 +442,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
 					centerX = (f->xmin + f->xmax) / 2;
 					centerY = (f->ymin + f->ymax) / 2;
-					SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+					SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 					}
 					break;
 					default:
@@ -445,7 +451,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 					centerX = (f->xmin + f->xmax) / 2;
 					centerY = (f->ymin + f->ymax) / 2;
-					SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+					SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 					}
 					}
 					return 0;
@@ -598,7 +604,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 							f->ymax = mpf_get_d(newymax_gmp);
 							f->ymin = mpf_get_d(newymin_gmp);
 							
-							printf ("Zoom x%d  to X= %f\tY= %f\n", f->zoomfactor,
+							printf ("Zoom x%.2g  to X= %f\tY= %f\n", calculate_zoom_factor(f),
 								mpf_get_d(newCenterX_gmp), mpf_get_d(newCenterY_gmp));
 							
 							mpf_clear(newCenterX_gmp);
@@ -661,7 +667,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 							newCenterY = (f->ymin + f->ymax) / 2.0;
 						}
 						
-						printf ("Zoom x%d  to X= %f\tY= %f\n", f->zoomfactor,
+						printf ("Zoom x%.2g  to X= %f\tY= %f\n", calculate_zoom_factor(f),
 							newCenterX, newCenterY);
 						
 						// Calculer la nouvelle plage : diviser par le facteur de zoom
@@ -803,7 +809,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 							f->ymax = mpf_get_d(newymax_gmp);
 							f->ymin = mpf_get_d(newymin_gmp);
 							
-							printf ("UnZoom x%d  to X= %f\tY= %f\n", f->zoomfactor,
+							printf ("UnZoom x%.2g  to X= %f\tY= %f\n", calculate_zoom_factor(f),
 								mpf_get_d(newCenterX_gmp), mpf_get_d(newCenterY_gmp));
 							
 							mpf_clear(newCenterX_gmp);
@@ -866,7 +872,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 							newCenterY = (f->ymin + f->ymax) / 2.0;
 						}
 						
-						printf ("UnZoom x%d  to X= %f\tY= %f\n", f->zoomfactor,
+						printf ("UnZoom x%.2g  to X= %f\tY= %f\n", calculate_zoom_factor(f),
 							newCenterX, newCenterY);
 						
 						// Calculer la nouvelle plage : multiplier par le facteur de zoom
@@ -923,7 +929,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					centerX = (f->xmin + f->xmax) / 2;
 					centerY = (f->ymin + f->ymax) / 2;
 					if (g != NULL)
-						SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, f->zoomfactor, *renderTime, f);
+						SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 					SDL_UpdateRect (screen, 0, 0, screen->w, screen->h);
 
 				}

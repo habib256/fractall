@@ -99,8 +99,8 @@ SDLGUI.o: SDLGUI.c /usr/include/stdc-predef.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h \
  /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
  /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
- /usr/include/x86_64-linux-gnu/bits/uio_lim.h complexmath_gmp.h VonKoch.h \
- SDL_gfxPrimitives.h
+ /usr/include/x86_64-linux-gnu/bits/uio_lim.h complexmath_gmp.h \
+ gmp_pool.h VonKoch.h SDL_gfxPrimitives.h
 /usr/include/stdc-predef.h:
 /usr/include/stdlib.h:
 /usr/include/x86_64-linux-gnu/bits/libc-header-start.h:
@@ -233,5 +233,6 @@ exception.h:
 /usr/include/x86_64-linux-gnu/bits/xopen_lim.h:
 /usr/include/x86_64-linux-gnu/bits/uio_lim.h:
 complexmath_gmp.h:
+gmp_pool.h:
 VonKoch.h:
 SDL_gfxPrimitives.h:

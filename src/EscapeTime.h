@@ -13,6 +13,7 @@
 #ifdef HAVE_GMP
 #include <gmp.h>
 #include "complexmath_gmp.h"
+#include "gmp_pool.h"
 #endif
 
 // A portable color type.
@@ -29,7 +30,7 @@ typedef struct {
   int bailout;
   int zoomfactor;
   int type;
-  int colorMode;   // 0=SmoothFire, 1=Rainbow, 2=SmoothOcean
+  int colorMode;   // 0=SmoothFire, 1=SmoothOcean
   int *fmatrix;    // la matrice d'iteration
   complex *zmatrix;  // la matrice de la valeur de z a la derniere iteration
   color *cmatrix; // Une matrice de couleurs, soit la fractale finale.
@@ -38,6 +39,8 @@ typedef struct {
   mp_bitcnt_t gmp_precision; // Précision GMP en bits
   complex_gmp *zmatrix_gmp;  // Matrice GMP optionnelle
   mpf_t xmin_gmp, xmax_gmp, ymin_gmp, ymax_gmp;  // Coordonnées GMP pour précision
+  gmp_iteration_context iteration_ctx;  // Contexte pré-alloué pour itérations
+  gmp_mul_temps mul_temps;  // Temporaires de multiplication pré-alloués
 #endif
 } fractal;
 
