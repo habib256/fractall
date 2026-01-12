@@ -31,6 +31,8 @@ typedef struct {
   int zoomfactor;
   int type;
   int colorMode;   // 0=SmoothFire, 1=SmoothOcean
+  int cmatrix_valid;   // 1 si cmatrix est valide pour le colorMode actuel
+  int last_colorMode;  // colorMode lors du dernier calcul de cmatrix
   int *fmatrix;    // la matrice d'iteration
   complex *zmatrix;  // la matrice de la valeur de z a la derniere iteration
   color *cmatrix; // Une matrice de couleurs, soit la fractale finale.
@@ -122,10 +124,14 @@ void BurningShip_def (fractal* f);
 void Tricorn_def (fractal* f);
 void Mandelbulb_def (fractal* f);
 void Buddhabrot_def (fractal* f);
+void Lyapunov_def (fractal* f);
 
 // Buddhabrot special draw function (density algorithm)
 // gui parameter can be NULL if no GUI progress display needed
 Uint32 Buddhabrot_Draw (SDL_Surface*, fractal*, int, int, void* gui);
+
+// Lyapunov special draw function (exponent-based coloring)
+Uint32 Lyapunov_Draw (SDL_Surface*, fractal*, int, int, void* gui);
 
 // Utilitaire pour obtenir le nom de la fractale selon son type
 const char* Fractal_GetTypeName(int type);

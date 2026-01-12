@@ -14,6 +14,7 @@
 void complex_gmp_init(complex_gmp* z, mp_bitcnt_t prec) {
     mpf_init2(z->x, prec);
     mpf_init2(z->y, prec);
+    z->is_nan = 0;
 }
 
 void complex_gmp_clear(complex_gmp* z) {
@@ -64,7 +65,7 @@ complex_gmp complex_gmp_inf(mp_bitcnt_t prec) {
     complex_gmp_init(&rz, prec);
     // GMP n'a pas d'infini direct, on utilise un très grand nombre
     mpf_set_ui(rz.x, 1);
-    mpf_mul_2exp(rz.x, rz.x, 1000); // 2^1000
+    mpf_mul_2exp(rz.x, rz.x, GMP_INF_EXP); // 2^GMP_INF_EXP
     mpf_set_ui(rz.y, 0);
     return rz;
 }
@@ -72,9 +73,9 @@ complex_gmp complex_gmp_inf(mp_bitcnt_t prec) {
 complex_gmp complex_gmp_nan(mp_bitcnt_t prec) {
     complex_gmp rz;
     complex_gmp_init(&rz, prec);
-    // NaN simulé avec 0/0
     mpf_set_ui(rz.x, 0);
     mpf_set_ui(rz.y, 0);
+    rz.is_nan = 1;  // Marquer comme NaN
     return rz;
 }
 
@@ -83,6 +84,7 @@ complex_gmp complex_gmp_copy(complex_gmp z, mp_bitcnt_t prec) {
     complex_gmp_init(&rz, prec);
     mpf_set(rz.x, z.x);
     mpf_set(rz.y, z.y);
+    rz.is_nan = z.is_nan;  // Copier le flag NaN
     return rz;
 }
 
@@ -821,16 +823,15 @@ int complex_gmp_is_inf(complex_gmp z) {
     mpf_t threshold;
     mpf_init2(threshold, mpf_get_prec(z.x));
     mpf_set_ui(threshold, 1);
-    mpf_mul_2exp(threshold, threshold, 500); // 2^500
-    
+    mpf_mul_2exp(threshold, threshold, GMP_INF_EXP); // Cohérent avec complex_gmp_inf()
+
     int result = (mpf_cmp(z.x, threshold) > 0 || mpf_cmp(z.y, threshold) > 0);
     mpf_clear(threshold);
     return result;
 }
 
 int complex_gmp_is_nan(complex_gmp z) {
-    // NaN simulé: vérifier si les deux parties sont zéro mais qu'on devrait avoir une valeur
-    return 0; // Simplification
+    return z.is_nan;
 }
 
 int complex_gmp_cmp_mag(mpf_t threshold, complex_gmp z) {
@@ -911,4 +912,5 @@ void complex_gmp_mag2_to(mpf_t result, complex_gmp z, mpf_t temp1, mpf_t temp2) 
 void complex_gmp_copy_to(complex_gmp* dest, complex_gmp src) {
     mpf_set(dest->x, src.x);
     mpf_set(dest->y, src.y);
+    dest->is_nan = src.is_nan;
 }

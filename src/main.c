@@ -621,6 +621,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 							mpf_clear(two_gmp);
 							
 							precision_update_fractal(f);
+							precision_update_gmp_structures(f);
 							// Mettre à jour la précision des coordonnées GMP si nécessaire
 							if (f->gmp_precision != prec) {
 								mpf_set_prec(f->xmin_gmp, f->gmp_precision);
@@ -688,6 +689,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 						f->ymin = newymin;
 #ifdef HAVE_GMP
 						precision_update_fractal(f);
+						precision_update_gmp_structures(f);
 						// Synchroniser vers GMP si nécessaire
 						if (f->use_gmp) {
 							mpf_set_d(f->xmin_gmp, f->xmin);
@@ -826,6 +828,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 							mpf_clear(two_gmp);
 							
 							precision_update_fractal(f);
+							precision_update_gmp_structures(f);
 							// Mettre à jour la précision des coordonnées GMP si nécessaire
 							if (f->gmp_precision != prec) {
 								mpf_set_prec(f->xmin_gmp, f->gmp_precision);
@@ -893,6 +896,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 						f->ymin = newymin;
 #ifdef HAVE_GMP
 						precision_update_fractal(f);
+						precision_update_gmp_structures(f);
 						// Synchroniser vers GMP si nécessaire
 						if (f->use_gmp) {
 							mpf_set_d(f->xmin_gmp, f->xmin);

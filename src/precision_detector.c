@@ -82,3 +82,39 @@ void precision_update_fractal(fractal* f) {
         f->gmp_precision = precision_calculate_gmp_bits(f);
     }
 }
+
+// Met à jour les structures GMP (mul_temps, iteration_ctx) après un changement de précision
+void precision_update_gmp_structures(fractal* f) {
+#ifdef HAVE_GMP
+    if (f == NULL) return;
+    
+    if (f->use_gmp) {
+        // Si mul_temps n'est pas initialisé, l'initialiser
+        if (!f->mul_temps.initialized) {
+            gmp_mul_temps_init(&f->mul_temps, f->gmp_precision);
+        } else {
+            // Si la précision a changé, mettre à jour mul_temps
+            mpf_set_prec(f->mul_temps.t1, f->gmp_precision);
+            mpf_set_prec(f->mul_temps.t2, f->gmp_precision);
+            mpf_set_prec(f->mul_temps.t3, f->gmp_precision);
+            mpf_set_prec(f->mul_temps.t4, f->gmp_precision);
+        }
+        
+        // Si iteration_ctx n'est pas initialisé, l'initialiser
+        if (!f->iteration_ctx.initialized) {
+            gmp_iteration_context_init(&f->iteration_ctx, f->gmp_precision);
+        } else {
+            // Si la précision a changé, mettre à jour iteration_ctx
+            gmp_iteration_context_set_precision(&f->iteration_ctx, f->gmp_precision);
+        }
+    } else {
+        // Si use_gmp est désactivé, libérer les structures si elles sont initialisées
+        if (f->mul_temps.initialized) {
+            gmp_mul_temps_clear(&f->mul_temps);
+        }
+        if (f->iteration_ctx.initialized) {
+            gmp_iteration_context_clear(&f->iteration_ctx);
+        }
+    }
+#endif
+}

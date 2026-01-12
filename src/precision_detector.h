@@ -22,4 +22,8 @@ mp_bitcnt_t precision_calculate_gmp_bits(fractal* f);
 // Met à jour le flag use_gmp dans la structure fractal
 void precision_update_fractal(fractal* f);
 
+// Met à jour les structures GMP (mul_temps, iteration_ctx) après un changement de précision
+// À appeler après precision_update_fractal
+void precision_update_gmp_structures(fractal* f);
+
 #endif /* PRECISION_DETECTOR_H */

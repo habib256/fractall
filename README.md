@@ -93,4 +93,4 @@ GPL-2.0 - See LICENSE file for details.
 
 ## Author
 
-Arnaud VERHILLE (2001-2003)
+Arnaud VERHILLE (2001-2026)

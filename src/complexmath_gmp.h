@@ -15,7 +15,11 @@
 typedef struct {
     mpf_t x;  // Partie réelle
     mpf_t y;  // Partie imaginaire
+    int is_nan;  // Flag NaN (1 si NaN, 0 sinon)
 } complex_gmp;
+
+// Seuil pour détection d'infinité (2^GMP_INF_EXP)
+#define GMP_INF_EXP 1000
 
 // Initialisation et destruction
 void complex_gmp_init(complex_gmp* z, mp_bitcnt_t prec);
