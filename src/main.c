@@ -178,7 +178,7 @@ main (int argc, char *argv[])
 	
 	// On initialise le menu si useGui = TRUE
 	if (useGui)
-		g = SDLGUI_Init (0, 0, win.w, win.y1, stateH, SDL_MapRGB (screen->format, 213, 214, 213), 16);	// 16 boutons (types 1-16)
+		g = SDLGUI_Init (0, 0, win.w, win.y1, stateH, SDL_MapRGB (screen->format, 213, 214, 213), 17);	// 17 boutons (types 1-17)
 	if (useGui)
 		SDLGUI_Draw (screen, &g);
 	
@@ -274,6 +274,9 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				if (*typeFractale >= 3) {
 					if (*typeFractale == 16) {
 						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+					} else if (*typeFractale == 17) {
+						// Lyapunov utilise sa propre fonction de rendu avec coloration intégrée
+						*renderTime = Lyapunov_Draw (screen, f, 0, win.y1, g);
 					} else {
 						// Recalculer seulement la colorisation (sans progression car rapide)
 						int dummyProgress = 0;
@@ -440,6 +443,15 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					{
 					Fractal_ChangeType (f, 16);
 					*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+					centerX = (f->xmin + f->xmax) / 2;
+					centerY = (f->ymin + f->ymax) / 2;
+					SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
+					}
+					break;
+					case 17:
+					{
+					Fractal_ChangeType (f, 17);
+					*renderTime = Lyapunov_Draw (screen, f, 0, win.y1, g);
 					centerX = (f->xmin + f->xmax) / 2;
 					centerY = (f->ymin + f->ymax) / 2;
 					SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
@@ -924,9 +936,11 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 						}
 #endif
 					}
-					// Buddhabrot utilise son propre algorithme de rendu
+					// Buddhabrot et Lyapunov utilisent leur propre algorithme de rendu
 					if (*typeFractale == 16) {
 						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+					} else if (*typeFractale == 17) {
+						*renderTime = Lyapunov_Draw (screen, f, 0, win.y1, g);
 					} else {
 						*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 					}

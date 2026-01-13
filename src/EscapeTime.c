@@ -1074,6 +1074,14 @@ int Fractal_ReadColorMatrixGreen (fractal f, int i, int j) {
 
 Uint32 Fractal_Draw (SDL_Surface *canvas, fractal myfractal,int decalageX,int decalageY, void* guiPtr) {
 
+	// Les fractales spéciales (Buddhabrot, Lyapunov) utilisent leur propre algorithme de rendu
+	if (myfractal.type == 16) {
+		return Buddhabrot_Draw(canvas, &myfractal, decalageX, decalageY, guiPtr);
+	}
+	if (myfractal.type == 17) {
+		return Lyapunov_Draw(canvas, &myfractal, decalageX, decalageY, guiPtr);
+	}
+
 	int i, j;
 	Uint8 r, g, b;
 	Uint32 time; // Test de temps de calcul en ms

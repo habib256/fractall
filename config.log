@@ -29,11 +29,11 @@ uname -v = #37~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Nov 20 10:25:38 UTC 2
 
 PATH: /home/gistarcade/.local/bin/
 PATH: /home/gistarcade/.local/bin/
-PATH: /tmp/.mount_Cursorf7Kr5Z/usr/bin/
-PATH: /tmp/.mount_Cursorf7Kr5Z/usr/sbin/
-PATH: /tmp/.mount_Cursorf7Kr5Z/usr/games/
-PATH: /tmp/.mount_Cursorf7Kr5Z/bin/
-PATH: /tmp/.mount_Cursorf7Kr5Z/sbin/
+PATH: /tmp/.mount_CursorW7FPB6/usr/bin/
+PATH: /tmp/.mount_CursorW7FPB6/usr/sbin/
+PATH: /tmp/.mount_CursorW7FPB6/usr/games/
+PATH: /tmp/.mount_CursorW7FPB6/bin/
+PATH: /tmp/.mount_CursorW7FPB6/sbin/
 PATH: /home/gistarcade/.local/bin/
 PATH: /usr/local/sbin/
 PATH: /usr/local/bin/

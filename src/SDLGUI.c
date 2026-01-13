@@ -106,6 +106,15 @@ void SDLGUI_Button_Draw (SDL_Surface* screen, gui* g, int xplace) {
 	Fractal_Destroy (f);
   }
   break;
+  case 17:
+  {
+  	// Lyapunov utilise son propre algorithme de rendu
+  	fractal f;
+	f = Fractal_Init (g->buttonSize-4, g->buttonSize-4, 17);
+	Lyapunov_Draw (screen, &f, xplace+2, 4, NULL);  // NULL = pas de progression pour le bouton
+	Fractal_Destroy (f);
+  }
+  break;
   default:
   {
   	fractal f;
