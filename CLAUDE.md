@@ -42,6 +42,7 @@ fractall [OPTIONS]
 |--------|-------|
 | **F1-F8** | Von Koch, Dragon, Mandelbrot, Julia, Julia Sin, Newton, Phoenix, Sierpinski |
 | **F9-F12** | Burning Ship, Tricorn, Mandelbulb, Buddhabrot |
+| **GUI** | 17 boutons pour sélectionner toutes les fractales (types 1-17) |
 | **Clic gauche** | Zoom / +1 itération (vectorielles) |
 | **Clic droit** | Dézoom / -1 itération |
 | **C** | Changer palette |
@@ -71,7 +72,7 @@ src/
 | 1 | Von Koch | 8 |
 | 2 | Dragon | 20 |
 
-### Escape-time - Types 3-16
+### Escape-time - Types 3-17
 
 | Type | Nom | Formule |
 |------|-----|---------|
@@ -89,10 +90,11 @@ src/
 | 14 | Tricorn | z(n+1) = conj(z)² + c |
 | 15 | Mandelbulb | z(n+1) = z(n)⁸ + c |
 | 16 | Buddhabrot | Densité des trajectoires d'échappement |
+| 17 | Lyapunov | Exposant de Lyapunov de la suite logistique |
 
-**Note** : F9-F12 mappent vers les types 13-16 (les types 9-12 sont accessibles via GUI).
+**Note** : F9-F12 mappent vers les types 13-16 (les types 9-12 et 17 sont accessibles via GUI).
 
-### Buddhabrot
+### Buddhabrot (Type 16)
 
 Algorithme de densité différent :
 1. Échantillonnage aléatoire du plan complexe
@@ -100,16 +102,33 @@ Algorithme de densité différent :
 3. Incrémente un compteur de densité par pixel traversé
 4. Couleur finale basée sur densité (échelle log)
 
+### Lyapunov (Type 17)
+
+Algorithme basé sur l'exposant de Lyapunov :
+1. Calcule l'exposant de Lyapunov de la suite logistique x_{n+1} = r_n × x_n × (1 - x_n)
+2. Le paramètre r alterne entre a (axe X) et b (axe Y) selon la séquence "AB"
+3. Phase de stabilisation (warmup) de 50 itérations
+4. Calcul de l'exposant sur 200 itérations par défaut
+5. Coloration :
+   - Exposant négatif (stable) : gradient bleu → cyan → jaune
+   - Exposant positif (chaotique) : noir
+6. Domaine classique : a et b entre 2.0 et 4.0
+
 ## Palettes de couleurs
 
-2 palettes disponibles (touche **C**) :
+5 palettes disponibles (touche **C**) :
 
 | Mode | Description |
 |------|-------------|
-| SmoothFire | Noir → Rouge → Jaune → Blanc (dégradés fluides, répétition 4×) |
-| SmoothOcean | Noir → Bleu → Cyan → Blanc (dégradés fluides, répétition 4×) |
+| SmoothFire (0) | Noir → Rouge → Jaune → Blanc (dégradés fluides, répétition 4×) |
+| SmoothOcean (1) | Noir → Bleu → Cyan → Blanc (dégradés fluides, répétition 4×) |
+| SmoothForest (2) | Noir → Vert → Jaune → Blanc (dégradés fluides, répétition 4×) |
+| SmoothViolet (3) | Noir → Violet → Rose → Blanc (dégradés fluides, répétition 4×) |
+| SmoothRainbow (4) | Arc-en-ciel complet (Rouge → Orange → Jaune → Vert → Cyan → Bleu → Violet) |
 
-Les deux utilisent une interpolation continue basée sur |z| et alternent endroit/envers pour éviter les transitions brutales.
+Toutes utilisent une interpolation continue basée sur |z| et alternent endroit/envers pour éviter les transitions brutales.
+
+**Note** : Buddhabrot et Lyapunov ont leur propre algorithme de coloration et ne sont pas affectés par le changement de palette.
 
 ## Structure principale
 
@@ -124,8 +143,8 @@ typedef struct {
   int iterationMax;         // Limite d'itérations
   int bailout;              // Seuil d'échappement (généralement 4)
   int zoomfactor;           // Facteur de zoom (2-8 selon fractale)
-  int type;                 // Type de fractale (1-16)
-  int colorMode;            // 0=SmoothFire, 1=SmoothOcean
+  int type;                 // Type de fractale (1-17)
+  int colorMode;            // 0=SmoothFire, 1=SmoothOcean, 2=SmoothForest, 3=SmoothViolet, 4=SmoothRainbow
   int *fmatrix;             // Matrice d'itérations
   complex *zmatrix;         // Valeurs z finales
   color *cmatrix;           // Couleurs calculées
@@ -186,5 +205,8 @@ main()
 ## Notes
 
 - GUI : 51px en haut, barre d'état : 20px en bas
-- `Buddhabrot_Draw()` pour le type 16
-- `Fractal_GetTypeName()` retourne le nom selon le type
+- 17 boutons dans le GUI (types 1-17)
+- `Buddhabrot_Draw()` pour le type 16 (algorithme de densité)
+- `Lyapunov_Draw()` pour le type 17 (algorithme d'exposant de Lyapunov)
+- `Fractal_Draw()` détecte automatiquement les types 16 et 17 et appelle leurs fonctions spécialisées
+- `Fractal_GetTypeName()` retourne le nom selon le type (0-17)
