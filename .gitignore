@@ -1,0 +1,63 @@
+# Fichiers générés par autoconf/automake
+autom4te.cache/
+aclocal.m4
+config.h
+config.log
+config.status
+stamp-h1
+libtool
+ltmain.sh
+
+# Fichiers de configuration générés
+config.guess
+config.sub
+compile
+depcomp
+install-sh
+missing
+
+# Fichiers configure générés (garder configure.ac)
+configure
+configure~
+
+# Fichiers Makefile générés (garder Makefile.am)
+Makefile
+Makefile.in
+src/Makefile
+src/Makefile.in
+
+# Fichiers de compilation
+*.o
+*.lo
+*.la
+*.a
+*.so
+*.dylib
+*.dll
+
+# Répertoires de dépendances
+.deps/
+src/.deps/
+
+
+# Fichiers temporaires et de sauvegarde
+*~
+*.swp
+*.swo
+*.bak
+config.h.in~
+
+# Fichiers IDE
+fractall.anjuta
+*.kdev4
+.vscode/
+.idea/
+
+# Fichiers de débogage
+*.dSYM/
+core
+vgcore.*
+
+# Fichiers de test
+*.test
+*.trs
