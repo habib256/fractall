@@ -1,4 +1,14 @@
-2025-01-09  Claude Code
+2026-01-13  Arnaud VERHILLE
+	* Version 1.0
+	* Added Lyapunov fractal (type 17) with specialized rendering algorithm
+	* Expanded color palettes to 5 smooth variants (SmoothFire, SmoothOcean, SmoothForest, SmoothViolet, SmoothRainbow)
+	* Improved fractal rendering system with automatic detection of specialized fractals
+	* Updated GUI to support 17 fractal types
+	* Enhanced documentation (CLAUDE.md, README.md)
+	* Added .gitignore for build artifacts and generated files
+	* Improved code organization and maintainability
+
+2025-01-09  Arnaud VERHILLE
 	* Version 0.5.1
 	* Added smooth coloring with 3 new palettes (Rainbow, SmoothFire, SmoothOcean)
 	* Added status bar showing fractal info and render time
