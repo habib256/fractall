@@ -357,56 +357,59 @@ void Fractal_CalculateMatrix_DDp1 (fractal* f, SDL_Surface* canvas, void* guiPtr
 		return;
 	}
 #endif
-	int i, j;
-	double xg, yg;
-	complex zPixel;
-	fractalresult result;
-	int totalPixels, currentPixel = 0;
-	int lastPercent = -1;
-	int progressInterval;
-	
+	int j;
+	int xpixel = f->xpixel;
+	int ypixel = f->ypixel;
+	double xmin = f->xmin;
+	double ymin = f->ymin;
+	double xstep = (f->xmax - f->xmin) / xpixel;
+	double ystep = (f->ymax - f->ymin) / ypixel;
+
 	printf ("Calculating EscapeTimeFractal Matrix with DDp1 ...\n");
-	
-	// Calculer le nombre total de pixels à traiter (grille 2x2)
-	totalPixels = ((f->xpixel + 1) / 2) * ((f->ypixel + 1) / 2);
-	progressInterval = totalPixels / 100;
-	if (progressInterval < 1) progressInterval = 1;
-	
-	for (j=0; j<f->ypixel; j=j+2) {
-		for (i=0; i<f->xpixel; i=i+2) {
-			// Mise à jour de la progression
-			if (guiPtr != NULL && (currentPixel % progressInterval == 0)) {
-				int percent = progressStart + ((currentPixel * (progressEnd - progressStart)) / totalPixels);
-				if (percent != lastPercent && percent <= progressEnd) {
-					SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
-					*progress = percent;
-					lastPercent = percent;
-				}
-			}
-			currentPixel++;
-			
-			xg = ((f->xmax-f->xmin)/f->xpixel)*i + f->xmin;
-			yg = ((f->ymax-f->ymin)/f->ypixel)*j + f->ymin;
-			zPixel = MakeComplex (xg, yg);
-			
-			result = FormulaSelector (*f,zPixel);
-			*((f->fmatrix)+((f->xpixel*j)+i)) = result.iteration;
-			*((f->zmatrix)+((f->xpixel*j)+i)) = result.z;
-			
+#ifdef HAVE_OPENMP
+	printf("Using OpenMP with %d threads\n", omp_get_max_threads());
+#endif
+
+	// Mise à jour initiale de la progression
+	if (guiPtr != NULL && progress != NULL) {
+		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progressStart, fractalName);
+		*progress = progressStart;
+	}
+
+#ifdef HAVE_OPENMP
+	#pragma omp parallel for schedule(dynamic, 8)
+#endif
+	for (j = 0; j < ypixel; j += 2) {
+		int i;
+		for (i = 0; i < xpixel; i += 2) {
+			double xg = xstep * i + xmin;
+			double yg = ystep * j + ymin;
+			complex zPixel = MakeComplex(xg, yg);
+
+			fractalresult result = FormulaSelector(*f, zPixel);
+			f->fmatrix[xpixel * j + i] = result.iteration;
+			f->zmatrix[xpixel * j + i] = result.z;
+
 			// On complete pour un preview tout en evitant Segfault
-			if ((i+1) < f->xpixel) {
-				*((f->fmatrix)+((f->xpixel*j)+(i+1))) = result.iteration;
-				*((f->zmatrix)+((f->xpixel*j)+(i+1))) = result.z;
+			if ((i + 1) < xpixel) {
+				f->fmatrix[xpixel * j + (i + 1)] = result.iteration;
+				f->zmatrix[xpixel * j + (i + 1)] = result.z;
 			}
-			if ((j+1) < f->ypixel) {
-				*((f->fmatrix)+((f->xpixel*(j+1))+i)) = result.iteration;
-				*((f->zmatrix)+((f->xpixel*(j+1))+i)) = result.z;
+			if ((j + 1) < ypixel) {
+				f->fmatrix[xpixel * (j + 1) + i] = result.iteration;
+				f->zmatrix[xpixel * (j + 1) + i] = result.z;
 			}
-			if ( ((i+1) < f->xpixel) && ((j+1) < f->ypixel)) {
-				*((f->fmatrix)+((f->xpixel*(j+1))+(i+1))) = result.iteration;
-				*((f->zmatrix)+((f->xpixel*(j+1))+(i+1))) = result.z;
+			if (((i + 1) < xpixel) && ((j + 1) < ypixel)) {
+				f->fmatrix[xpixel * (j + 1) + (i + 1)] = result.iteration;
+				f->zmatrix[xpixel * (j + 1) + (i + 1)] = result.z;
 			}
 		}
+	}
+
+	// Mise à jour finale de la progression
+	if (guiPtr != NULL && progress != NULL) {
+		*progress = progressEnd;
+		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progressEnd, fractalName);
 	}
 }
 
@@ -606,114 +609,121 @@ void Fractal_CalculateMatrix_DDp2 (fractal* f, SDL_Surface* canvas, void* guiPtr
 		return;
 	}
 #endif
-	int i,starti, j, compteur;
-	int up, down, left, right;
-	complex zup, zdown, zleft, zright;
-	double xg, yg, rz, iz;
-	complex zPixel;
-	fractalresult result;
-	int totalPixels, currentPixel = 0;
-	int lastPercent = -1;
-	int progressInterval;
-	int pass1Pixels, pass2Pixels;
-	
+	int j;
+	int xpixel = f->xpixel;
+	int ypixel = f->ypixel;
+	double xmin = f->xmin;
+	double ymin = f->ymin;
+	double xstep = (f->xmax - f->xmin) / xpixel;
+	double ystep = (f->ymax - f->ymin) / ypixel;
+	int progressMid = progressStart + (progressEnd - progressStart) / 2;
+
 	printf ("Calculating EscapeTimeFractal Matrix with DDp2 ...\n");
-	
-	// Calculer le nombre total de pixels à traiter
-	// Pass 1: pixels impairs (j=1, i=1, step 2)
-	pass1Pixels = ((f->xpixel - 1) / 2) * ((f->ypixel - 1) / 2);
-	// Pass 2: pixels restants (divergence detection)
-	pass2Pixels = (f->xpixel * f->ypixel) / 2;
-	totalPixels = pass1Pixels + pass2Pixels;
-	progressInterval = totalPixels / 100;
-	if (progressInterval < 1) progressInterval = 1;
-	
-	// Pass 1: Calcul initial
-	for (j=1; j<f->ypixel; j=j+2) {
-		for (i=1; i<f->xpixel; i=i+2) {
-			// Mise à jour de la progression
-			if (guiPtr != NULL && (currentPixel % progressInterval == 0)) {
-				int percent = progressStart + ((currentPixel * (progressEnd - progressStart)) / totalPixels);
-				if (percent != lastPercent && percent <= progressEnd) {
-					SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
-					*progress = percent;
-					lastPercent = percent;
-				}
-			}
-			currentPixel++;
-			
-			xg = ((f->xmax-f->xmin)/f->xpixel)*i + f->xmin;
-			yg = ((f->ymax-f->ymin)/f->ypixel)*j + f->ymin;
-			zPixel = MakeComplex (xg, yg);
-			
-			result = FormulaSelector (*f,zPixel);
-			*((f->fmatrix)+((f->xpixel*j)+i)) = result.iteration;
-			*((f->zmatrix)+((f->xpixel*j)+i)) = result.z;
+#ifdef HAVE_OPENMP
+	printf("Using OpenMP with %d threads\n", omp_get_max_threads());
+#endif
+
+	// Mise à jour initiale de la progression
+	if (guiPtr != NULL && progress != NULL) {
+		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progressStart, fractalName);
+		*progress = progressStart;
+	}
+
+	// Pass 1: Calcul initial des pixels impairs (parallélisable)
+#ifdef HAVE_OPENMP
+	#pragma omp parallel for schedule(dynamic, 8)
+#endif
+	for (j = 1; j < ypixel; j += 2) {
+		int i;
+		for (i = 1; i < xpixel; i += 2) {
+			double xg = xstep * i + xmin;
+			double yg = ystep * j + ymin;
+			complex zPixel = MakeComplex(xg, yg);
+
+			fractalresult result = FormulaSelector(*f, zPixel);
+			f->fmatrix[xpixel * j + i] = result.iteration;
+			f->zmatrix[xpixel * j + i] = result.z;
 		}
 	}
 
-	// Pass 2: Dernier passage, cette fois on compare pour savoir si l'on peut se
-	// permettre d'eviter le calcul, c'est la Divergence Detection (DD)
-	
-	for (j=0; j<f->ypixel; j++) {
-		if (fmod (j,2) == 0) {starti=1;} else {starti=0;} // Lignes paires et impaires
-		for (i=starti; i<f->xpixel; i=i+2) {
-			// Mise à jour de la progression
-			if (guiPtr != NULL && (currentPixel % progressInterval == 0)) {
-				int percent = progressStart + ((currentPixel * (progressEnd - progressStart)) / totalPixels);
-				if (percent != lastPercent && percent <= progressEnd) {
-					SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
-					*progress = percent;
-					lastPercent = percent;
-				}
-			}
-			currentPixel++;
-			
+	// Mise à jour de la progression après Pass 1
+	if (guiPtr != NULL && progress != NULL) {
+		*progress = progressMid;
+		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progressMid, fractalName);
+	}
+
+	// Pass 2: Divergence Detection (parallélisable - chaque pixel écrit à son propre indice)
+#ifdef HAVE_OPENMP
+	#pragma omp parallel for schedule(dynamic, 8)
+#endif
+	for (j = 0; j < ypixel; j++) {
+		int starti = (j % 2 == 0) ? 1 : 0;  // Lignes paires et impaires
+		int i;
+		for (i = starti; i < xpixel; i += 2) {
+			int compteur = 0;
+			int up, down, left, right;
+			complex zup, zdown, zleft, zright;
+
 			// Verifions les bords des matrices pour eviter Seg Fault
-			compteur=0;
 			if (j != 0) {
-				up = *((f->fmatrix)+((f->xpixel*(j-1))+i));
-				zup = *((f->zmatrix)+((f->xpixel*(j-1))+i));
+				up = f->fmatrix[xpixel * (j - 1) + i];
+				zup = f->zmatrix[xpixel * (j - 1) + i];
 				compteur++;
-      } else { up = 0; zup = ZeroSetofComplex();}
-      if (j < (f->ypixel-1)) {
-		  down = *((f->fmatrix)+((f->xpixel*(j+1))+i));
-		  zdown = *((f->zmatrix)+((f->xpixel*(j+1))+i));
-		  compteur++;
-      } else { down = 0; zdown = ZeroSetofComplex(); }
-      if (i != 0) {
-		  left = *((f->fmatrix)+((f->xpixel*j)+(i-1)));
-		  zleft = *((f->zmatrix)+((f->xpixel*j)+(i-1)));
-		  compteur++;
-      } else { left = 0; zleft = ZeroSetofComplex();}
-      if (i < (f->xpixel-1)) {
-		  right = *((f->fmatrix)+((f->xpixel*j)+(i+1)));
-		  zright = *((f->zmatrix)+((f->xpixel*j)+(i+1)));
-		  compteur++;
-      } else { right = 0; zright = ZeroSetofComplex();}
-      
-      /* Si les points adjacents ont meme valeur de divergence alors */
-      if ((up == right) && (right == down) && (down == left) && (left == up)) {
-		  
-		  // OK, on ne calcule pas les Iterations
-		  *((f->fmatrix)+((f->xpixel*j)+i)) = up;
-		  
-		  // Et on calcule une moyenne pour la valeur de z
-		  rz = (Rez(zup)+Rez(zdown)+Rez(zleft)+Rez(zright))/compteur;
-		  iz = (Imz(zup)+Imz(zdown)+Imz(zleft)+Imz(zright))/compteur;
-		  *((f->zmatrix)+((f->xpixel*j)+i)) = MakeComplex (rz, iz);
-		  
-      } else { // Sinon, je calcule
-		  double xg, yg; 
-		  xg = ((f->xmax-f->xmin)/f->xpixel)*i + f->xmin;
-		  yg = ((f->ymax-f->ymin)/f->ypixel)*j + f->ymin;
-		  zPixel = MakeComplex (xg, yg);
-		  
-		  result = FormulaSelector (*f,zPixel);
-		  *((f->fmatrix)+((f->xpixel*j)+i)) = result.iteration;
-		  *((f->zmatrix)+((f->xpixel*j)+i)) = result.z;
-      }
+			} else {
+				up = 0;
+				zup = ZeroSetofComplex();
+			}
+			if (j < (ypixel - 1)) {
+				down = f->fmatrix[xpixel * (j + 1) + i];
+				zdown = f->zmatrix[xpixel * (j + 1) + i];
+				compteur++;
+			} else {
+				down = 0;
+				zdown = ZeroSetofComplex();
+			}
+			if (i != 0) {
+				left = f->fmatrix[xpixel * j + (i - 1)];
+				zleft = f->zmatrix[xpixel * j + (i - 1)];
+				compteur++;
+			} else {
+				left = 0;
+				zleft = ZeroSetofComplex();
+			}
+			if (i < (xpixel - 1)) {
+				right = f->fmatrix[xpixel * j + (i + 1)];
+				zright = f->zmatrix[xpixel * j + (i + 1)];
+				compteur++;
+			} else {
+				right = 0;
+				zright = ZeroSetofComplex();
+			}
+
+			/* Si les points adjacents ont meme valeur de divergence alors */
+			if ((up == right) && (right == down) && (down == left) && (left == up)) {
+				// OK, on ne calcule pas les Iterations
+				f->fmatrix[xpixel * j + i] = up;
+
+				// Et on calcule une moyenne pour la valeur de z
+				double rz = (Rez(zup) + Rez(zdown) + Rez(zleft) + Rez(zright)) / compteur;
+				double iz = (Imz(zup) + Imz(zdown) + Imz(zleft) + Imz(zright)) / compteur;
+				f->zmatrix[xpixel * j + i] = MakeComplex(rz, iz);
+			} else {
+				// Sinon, je calcule
+				double xg = xstep * i + xmin;
+				double yg = ystep * j + ymin;
+				complex zPixel = MakeComplex(xg, yg);
+
+				fractalresult result = FormulaSelector(*f, zPixel);
+				f->fmatrix[xpixel * j + i] = result.iteration;
+				f->zmatrix[xpixel * j + i] = result.z;
+			}
 		}
+	}
+
+	// Mise à jour finale de la progression
+	if (guiPtr != NULL && progress != NULL) {
+		*progress = progressEnd;
+		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progressEnd, fractalName);
 	}
 }
 
@@ -799,16 +809,21 @@ color HSVtoRGB(double h, double s, double v) {
 
 /* Palette Smooth Fire : version fluide de Fire avec répétition 4x (alternant endroit/envers) */
 void FractalColorSmoothFire(fractal* f) {
-	int i, j;
-	double t, t_repeat, cycle;
-	color c;
+	int j;
+	int xpixel = f->xpixel;
+	int ypixel = f->ypixel;
 
-	for (j = 0; j < f->ypixel; j++) {
-		for (i = 0; i < f->xpixel; i++) {
-			t = Fractal_SmoothIteration(f, i, j);
+#ifdef HAVE_OPENMP
+	#pragma omp parallel for schedule(static)
+#endif
+	for (j = 0; j < ypixel; j++) {
+		int i;
+		for (i = 0; i < xpixel; i++) {
+			double t = Fractal_SmoothIteration(f, i, j);
 			// Répéter la palette 4 fois de 0 au bailout
-			cycle = floor(t * 4.0);
-			t_repeat = fmod(t * 4.0, 1.0);
+			double cycle = floor(t * 4.0);
+			double t_repeat = fmod(t * 4.0, 1.0);
+			color c;
 			// Alterner entre l'endroit et l'envers pour éviter les transitions brutales
 			if ((int)cycle % 2 == 1) {
 				t_repeat = 1.0 - t_repeat;
@@ -826,23 +841,28 @@ void FractalColorSmoothFire(fractal* f) {
 				c.g = 255;
 				c.b = (int)((t_repeat - 0.66) * 3 * 255);
 			}
-			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
+			f->cmatrix[xpixel * j + i] = c;
 		}
 	}
 }
 
 /* Palette Smooth Ocean : version fluide de Ocean avec répétition 4x (alternant endroit/envers) */
 void FractalColorSmoothOcean(fractal* f) {
-	int i, j;
-	double t, t_repeat, cycle;
-	color c;
+	int j;
+	int xpixel = f->xpixel;
+	int ypixel = f->ypixel;
 
-	for (j = 0; j < f->ypixel; j++) {
-		for (i = 0; i < f->xpixel; i++) {
-			t = Fractal_SmoothIteration(f, i, j);
+#ifdef HAVE_OPENMP
+	#pragma omp parallel for schedule(static)
+#endif
+	for (j = 0; j < ypixel; j++) {
+		int i;
+		for (i = 0; i < xpixel; i++) {
+			double t = Fractal_SmoothIteration(f, i, j);
 			// Répéter la palette 4 fois de 0 au bailout
-			cycle = floor(t * 4.0);
-			t_repeat = fmod(t * 4.0, 1.0);
+			double cycle = floor(t * 4.0);
+			double t_repeat = fmod(t * 4.0, 1.0);
+			color c;
 			// Alterner entre l'endroit et l'envers pour éviter les transitions brutales
 			if ((int)cycle % 2 == 1) {
 				t_repeat = 1.0 - t_repeat;
@@ -860,22 +880,27 @@ void FractalColorSmoothOcean(fractal* f) {
 				c.g = 255;
 				c.b = 255;
 			}
-			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
+			f->cmatrix[xpixel * j + i] = c;
 		}
 	}
 }
 
 /* Palette Smooth Forest : Noir → Vert → Jaune → Blanc */
 void FractalColorSmoothForest(fractal* f) {
-	int i, j;
-	double t, t_repeat, cycle;
-	color c;
+	int j;
+	int xpixel = f->xpixel;
+	int ypixel = f->ypixel;
 
-	for (j = 0; j < f->ypixel; j++) {
-		for (i = 0; i < f->xpixel; i++) {
-			t = Fractal_SmoothIteration(f, i, j);
-			cycle = floor(t * 4.0);
-			t_repeat = fmod(t * 4.0, 1.0);
+#ifdef HAVE_OPENMP
+	#pragma omp parallel for schedule(static)
+#endif
+	for (j = 0; j < ypixel; j++) {
+		int i;
+		for (i = 0; i < xpixel; i++) {
+			double t = Fractal_SmoothIteration(f, i, j);
+			double cycle = floor(t * 4.0);
+			double t_repeat = fmod(t * 4.0, 1.0);
+			color c;
 			if ((int)cycle % 2 == 1) {
 				t_repeat = 1.0 - t_repeat;
 			}
@@ -895,22 +920,27 @@ void FractalColorSmoothForest(fractal* f) {
 				c.g = 255;
 				c.b = (int)((t_repeat - 0.66) * 3 * 255);
 			}
-			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
+			f->cmatrix[xpixel * j + i] = c;
 		}
 	}
 }
 
 /* Palette Smooth Violet : Noir → Violet → Rose → Blanc */
 void FractalColorSmoothViolet(fractal* f) {
-	int i, j;
-	double t, t_repeat, cycle;
-	color c;
+	int j;
+	int xpixel = f->xpixel;
+	int ypixel = f->ypixel;
 
-	for (j = 0; j < f->ypixel; j++) {
-		for (i = 0; i < f->xpixel; i++) {
-			t = Fractal_SmoothIteration(f, i, j);
-			cycle = floor(t * 4.0);
-			t_repeat = fmod(t * 4.0, 1.0);
+#ifdef HAVE_OPENMP
+	#pragma omp parallel for schedule(static)
+#endif
+	for (j = 0; j < ypixel; j++) {
+		int i;
+		for (i = 0; i < xpixel; i++) {
+			double t = Fractal_SmoothIteration(f, i, j);
+			double cycle = floor(t * 4.0);
+			double t_repeat = fmod(t * 4.0, 1.0);
+			color c;
 			if ((int)cycle % 2 == 1) {
 				t_repeat = 1.0 - t_repeat;
 			}
@@ -930,33 +960,39 @@ void FractalColorSmoothViolet(fractal* f) {
 				c.g = 100 + (int)((t_repeat - 0.66) * 3 * 155);
 				c.b = 255;
 			}
-			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
+			f->cmatrix[xpixel * j + i] = c;
 		}
 	}
 }
 
 /* Palette Smooth Rainbow : Arc-en-ciel complet */
 void FractalColorSmoothRainbow(fractal* f) {
-	int i, j, iteration;
-	double t, t_repeat, cycle;
-	color c;
+	int j;
+	int xpixel = f->xpixel;
+	int ypixel = f->ypixel;
+	int iterMax = f->iterationMax;
 
-	for (j = 0; j < f->ypixel; j++) {
-		for (i = 0; i < f->xpixel; i++) {
-			iteration = *((f->fmatrix)+((f->xpixel*j)+i));
+#ifdef HAVE_OPENMP
+	#pragma omp parallel for schedule(static)
+#endif
+	for (j = 0; j < ypixel; j++) {
+		int i;
+		for (i = 0; i < xpixel; i++) {
+			int iteration = f->fmatrix[xpixel * j + i];
+			color c;
 
 			// Points dans l'ensemble : noir
-			if (iteration >= f->iterationMax) {
+			if (iteration >= iterMax) {
 				c.r = 0;
 				c.g = 0;
 				c.b = 0;
-				*((f->cmatrix)+((f->xpixel*j)+i)) = c;
+				f->cmatrix[xpixel * j + i] = c;
 				continue;
 			}
 
-			t = Fractal_SmoothIteration(f, i, j);
-			cycle = floor(t * 4.0);
-			t_repeat = fmod(t * 4.0, 1.0);
+			double t = Fractal_SmoothIteration(f, i, j);
+			double cycle = floor(t * 4.0);
+			double t_repeat = fmod(t * 4.0, 1.0);
 			if ((int)cycle % 2 == 1) {
 				t_repeat = 1.0 - t_repeat;
 			}
@@ -992,7 +1028,7 @@ void FractalColorSmoothRainbow(fractal* f) {
 				c.g = 0;
 				c.b = 255;
 			}
-			*((f->cmatrix)+((f->xpixel*j)+i)) = c;
+			f->cmatrix[xpixel * j + i] = c;
 		}
 	}
 }
@@ -1761,64 +1797,115 @@ void Buddhabrot_def (fractal* f) {
 
 /* Fonction de rendu spéciale pour Buddhabrot */
 Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decalageY, void* guiPtr) {
-	int i, j, iter;
-	int px, py;
-	double xg, yg;
-	complex c, z;
+	int i, j;
 	Uint32 time;
 	int numSamples;
-	double maxDensity;
-	color col;
-	int lastPercent = -1;
-	int progressInterval;
-
-	// Tableaux pour stocker la trajectoire
-	double *trajX, *trajY;
+	int maxDensity;
+	int xpixel = f->xpixel;
+	int ypixel = f->ypixel;
+	int iterMax = f->iterationMax;
+	int bailout = f->bailout;
+	double xmin = f->xmin;
+	double ymin = f->ymin;
+	double xrange = f->xmax - f->xmin;
+	double yrange = f->ymax - f->ymin;
 
 	time = SDL_GetTicks();
 
 	printf("Calculating Buddhabrot (density algorithm)...\n");
+#ifdef HAVE_OPENMP
+	printf("Using OpenMP with %d threads\n", omp_get_max_threads());
+#endif
 
-	// Allouer mémoire pour trajectoire
-	trajX = (double*) malloc(f->iterationMax * sizeof(double));
-	trajY = (double*) malloc(f->iterationMax * sizeof(double));
+	// Réinitialiser la matrice de densité (on utilise fmatrix)
+	for (i = 0; i < xpixel * ypixel; i++) {
+		f->fmatrix[i] = 0;
+	}
+
+	// Nombre d'échantillons proportionnel à la surface
+	numSamples = xpixel * ypixel * 50;
+#ifdef HAVE_GMP
+	// Réduire les échantillons avec GMP car le calcul est plus lent
+	if (f->use_gmp) {
+		numSamples = xpixel * ypixel * 5;
+	}
+#endif
+
+	// Mise à jour initiale de la progression
+	if (guiPtr != NULL) {
+		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, 0, "Buddhabrot");
+	}
+
+	// Phase 1: Échantillonnage parallèle avec OpenMP
+#ifdef HAVE_OPENMP
+	#pragma omp parallel
+	{
+		// Variables thread-local
+		unsigned int seed = 42 + omp_get_thread_num() * 1000;
+		double *trajX = (double*) malloc(iterMax * sizeof(double));
+		double *trajY = (double*) malloc(iterMax * sizeof(double));
+
+		if (trajX != NULL && trajY != NULL) {
+			#pragma omp for schedule(dynamic, 1000)
+			for (int sample = 0; sample < numSamples; sample++) {
+				// Générer un point c aléatoire (thread-safe)
+				double xg = ((double)rand_r(&seed) / RAND_MAX) * xrange + xmin;
+				double yg = ((double)rand_r(&seed) / RAND_MAX) * yrange + ymin;
+				complex c = MakeComplex(xg, yg);
+				complex z = ZeroSetofComplex();
+
+				// Itérer et stocker la trajectoire
+				int escaped = 0;
+				int iter;
+				for (iter = 0; iter < iterMax; iter++) {
+					complex zTemp = Mulz(z, z);
+					z = Addz(zTemp, c);
+
+					trajX[iter] = Rez(z);
+					trajY[iter] = Imz(z);
+
+					if (Magz(z) > bailout) {
+						escaped = 1;
+						break;
+					}
+				}
+
+				// Si le point s'échappe, tracer sa trajectoire
+				if (escaped) {
+					for (int i = 0; i < iter; i++) {
+						// Convertir coordonnées complexes en pixels
+						int px = (int)((trajX[i] - xmin) / xrange * xpixel);
+						int py = (int)((trajY[i] - ymin) / yrange * ypixel);
+
+						// Vérifier les limites et incrémenter la densité (atomic pour éviter race condition)
+						if (px >= 0 && px < xpixel && py >= 0 && py < ypixel) {
+							#pragma omp atomic
+							f->fmatrix[py * xpixel + px]++;
+						}
+					}
+				}
+			}
+		}
+
+		free(trajX);
+		free(trajY);
+	}
+#else
+	// Version séquentielle
+	double *trajX = (double*) malloc(iterMax * sizeof(double));
+	double *trajY = (double*) malloc(iterMax * sizeof(double));
 	if (trajX == NULL || trajY == NULL) {
 		fprintf(stderr, "Erreur allocation mémoire trajectoire\n");
 		return 0;
 	}
 
-	// Réinitialiser la matrice de densité (on utilise fmatrix)
-	for (i = 0; i < f->xpixel * f->ypixel; i++) {
-		f->fmatrix[i] = 0;
-	}
-
-	// Nombre d'échantillons proportionnel à la surface
-	numSamples = f->xpixel * f->ypixel * 50;
-#ifdef HAVE_GMP
-	// Réduire les échantillons avec GMP car le calcul est plus lent
-	if (f->use_gmp) {
-		numSamples = f->xpixel * f->ypixel * 5;
-	}
-#endif
-
-	// Intervalle de mise à jour de la progression (tous les 1%)
-	progressInterval = numSamples / 100;
-	if (progressInterval < 1) progressInterval = 1;
-
-	// Echantillonnage aléatoire
 	srand(42);  // Seed fixe pour reproductibilité
 
 	for (int sample = 0; sample < numSamples; sample++) {
-		// Mise à jour de la progression et traitement des événements
-		if (sample % progressInterval == 0) {
-			if (guiPtr != NULL) {
-				int percent = (sample * 100) / numSamples;
-				if (percent != lastPercent) {
-					SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, "Buddhabrot");
-					lastPercent = percent;
-				}
-			}
-			// Vérifier si l'utilisateur veut annuler
+		// Mise à jour de la progression
+		if (guiPtr != NULL && sample % (numSamples / 100 + 1) == 0) {
+			int percent = (sample * 100) / numSamples;
+			SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, "Buddhabrot");
 			if (check_events_and_cancel()) {
 				printf("Calcul Buddhabrot annulé par l'utilisateur\n");
 				free(trajX);
@@ -1827,60 +1914,68 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 			}
 		}
 
-		// Générer un point c aléatoire dans la zone
-		xg = ((double)rand() / RAND_MAX) * (f->xmax - f->xmin) + f->xmin;
-		yg = ((double)rand() / RAND_MAX) * (f->ymax - f->ymin) + f->ymin;
-		c = MakeComplex(xg, yg);
-		z = ZeroSetofComplex();
+		double xg = ((double)rand() / RAND_MAX) * xrange + xmin;
+		double yg = ((double)rand() / RAND_MAX) * yrange + ymin;
+		complex c = MakeComplex(xg, yg);
+		complex z = ZeroSetofComplex();
 
-		// Itérer et stocker la trajectoire
 		int escaped = 0;
-		for (iter = 0; iter < f->iterationMax; iter++) {
+		int iter;
+		for (iter = 0; iter < iterMax; iter++) {
 			complex zTemp = Mulz(z, z);
 			z = Addz(zTemp, c);
 
 			trajX[iter] = Rez(z);
 			trajY[iter] = Imz(z);
 
-			if (Magz(z) > f->bailout) {
+			if (Magz(z) > bailout) {
 				escaped = 1;
 				break;
 			}
 		}
 
-		// Si le point s'échappe, tracer sa trajectoire
 		if (escaped) {
-			for (i = 0; i < iter; i++) {
-				// Convertir coordonnées complexes en pixels
-				px = (int)((trajX[i] - f->xmin) / (f->xmax - f->xmin) * f->xpixel);
-				py = (int)((trajY[i] - f->ymin) / (f->ymax - f->ymin) * f->ypixel);
+			for (int i = 0; i < iter; i++) {
+				int px = (int)((trajX[i] - xmin) / xrange * xpixel);
+				int py = (int)((trajY[i] - ymin) / yrange * ypixel);
 
-				// Vérifier les limites et incrémenter la densité
-				if (px >= 0 && px < f->xpixel && py >= 0 && py < f->ypixel) {
-					f->fmatrix[py * f->xpixel + px]++;
+				if (px >= 0 && px < xpixel && py >= 0 && py < ypixel) {
+					f->fmatrix[py * xpixel + px]++;
 				}
 			}
 		}
 	}
 
-	// Trouver la densité maximale pour normalisation
+	free(trajX);
+	free(trajY);
+#endif
+
+	// Mise à jour de la progression après l'échantillonnage
+	if (guiPtr != NULL) {
+		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, 90, "Buddhabrot");
+	}
+
+	// Phase 2: Trouver la densité maximale (parallélisable avec reduction)
 	maxDensity = 1;
-	for (i = 0; i < f->xpixel * f->ypixel; i++) {
+#ifdef HAVE_OPENMP
+	#pragma omp parallel for reduction(max:maxDensity)
+#endif
+	for (i = 0; i < xpixel * ypixel; i++) {
 		if (f->fmatrix[i] > maxDensity) {
 			maxDensity = f->fmatrix[i];
 		}
 	}
 
-	// Convertir densité en couleurs et afficher
-	for (j = 0; j < f->ypixel; j++) {
-		for (i = 0; i < f->xpixel; i++) {
-			double density = (double)f->fmatrix[j * f->xpixel + i];
+	// Phase 3: Convertir densité en couleurs et afficher (SDL séquentiel)
+	double logMaxDensity = log(1 + maxDensity);
+	for (j = 0; j < ypixel; j++) {
+		for (i = 0; i < xpixel; i++) {
+			double density = (double)f->fmatrix[j * xpixel + i];
 			// Utiliser une échelle logarithmique pour mieux voir les détails
-			double normalized = log(1 + density) / log(1 + maxDensity);
+			double normalized = log(1 + density) / logMaxDensity;
 
-			// Appliquer la palette selon colorMode
 			// Pour Buddhabrot, on garde toujours les couleurs d'origine (violet/bleu classique)
-			// indépendamment du colorMode pour préserver l'apparence caractéristique
+			color col;
 			col.r = (int)(normalized * 180);
 			col.g = (int)(normalized * 100);
 			col.b = (int)(normalized * 255);
@@ -1891,9 +1986,6 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 	}
 
 	SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
-
-	free(trajX);
-	free(trajY);
 
 	time = SDL_GetTicks() - time;
 	printf("Buddhabrot rendered in %d ms (%d samples)\n", time, numSamples);
@@ -1921,30 +2013,39 @@ void Lyapunov_def (fractal* f) {
  * avec r alternant entre a (x) et b (y) selon la séquence "AB"
  */
 Uint32 Lyapunov_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decalageY, void* guiPtr) {
-	int i, j, n;
-	double a, b, r, x, lyap;
+	int i, j;
 	double xStep, yStep;
-	color col;
 	Uint32 time;
 	const char* sequence = "AB";  // Séquence de Lyapunov classique
 	int seqLen = 2;
 	int warmup = 50;  // Itérations de stabilisation
+	int iterMax = f->iterationMax;
+	int xpixel = f->xpixel;
+	int ypixel = f->ypixel;
 
 	time = SDL_GetTicks();
 	printf("Calculating Lyapunov fractal...\n");
+#ifdef HAVE_OPENMP
+	printf("Using OpenMP with %d threads\n", omp_get_max_threads());
+#endif
 
-	xStep = (f->xmax - f->xmin) / f->xpixel;
-	yStep = (f->ymax - f->ymin) / f->ypixel;
+	xStep = (f->xmax - f->xmin) / xpixel;
+	yStep = (f->ymax - f->ymin) / ypixel;
 
-	for (j = 0; j < f->ypixel; j++) {
-		b = f->ymin + j * yStep;  // Paramètre b sur l'axe Y
+	// Phase 1: Calcul parallèle des exposants et couleurs
+#ifdef HAVE_OPENMP
+	#pragma omp parallel for private(i) schedule(dynamic, 16)
+#endif
+	for (j = 0; j < ypixel; j++) {
+		double b = f->ymin + j * yStep;  // Paramètre b sur l'axe Y
 
-		for (i = 0; i < f->xpixel; i++) {
-			a = f->xmin + i * xStep;  // Paramètre a sur l'axe X
-
-			// Initialisation
-			x = 0.5;  // Valeur initiale classique
-			lyap = 0.0;
+		for (i = 0; i < xpixel; i++) {
+			double a = f->xmin + i * xStep;  // Paramètre a sur l'axe X
+			double x = 0.5;  // Valeur initiale classique
+			double lyap = 0.0;
+			double r;
+			int n;
+			color col;
 
 			// Phase de stabilisation (warmup)
 			for (n = 0; n < warmup; n++) {
@@ -1954,7 +2055,7 @@ Uint32 Lyapunov_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decala
 			}
 
 			// Calcul de l'exposant de Lyapunov
-			for (n = 0; n < f->iterationMax; n++) {
+			for (n = 0; n < iterMax; n++) {
 				r = (sequence[n % seqLen] == 'A') ? a : b;
 				x = r * x * (1.0 - x);
 
@@ -1970,10 +2071,10 @@ Uint32 Lyapunov_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decala
 				}
 			}
 
-			lyap /= f->iterationMax;
+			lyap /= iterMax;
 
 			// Stocker l'exposant (multiplié par 1000 pour précision en int)
-			f->fmatrix[j * f->xpixel + i] = (int)(lyap * 1000);
+			f->fmatrix[j * xpixel + i] = (int)(lyap * 1000);
 
 			// Coloration basée sur l'exposant de Lyapunov
 			if (lyap < 0) {
@@ -1999,15 +2100,24 @@ Uint32 Lyapunov_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decala
 				col.b = 0;
 			}
 
+			// Stocker la couleur dans cmatrix
+			f->cmatrix[j * xpixel + i] = col;
+		}
+	}
+
+	// Phase 2: Rendu SDL séquentiel (SDL n'est pas thread-safe)
+	for (j = 0; j < ypixel; j++) {
+		for (i = 0; i < xpixel; i++) {
+			color col = f->cmatrix[j * xpixel + i];
 			pixelRGBA(canvas, (Sint16)(i + decalageX), (Sint16)(j + decalageY),
 			          col.r, col.g, col.b, 255);
 		}
 
-		// Mise à jour de l'affichage tous les 10 lignes
-		if (j % 10 == 0) {
+		// Mise à jour de l'affichage tous les 50 lignes
+		if (j % 50 == 0) {
 			SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
 			if (guiPtr != NULL) {
-				int percent = (j * 100) / f->ypixel;
+				int percent = (j * 100) / ypixel;
 				SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, "Lyapunov");
 			}
 		}

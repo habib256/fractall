@@ -44,6 +44,11 @@ endif
 
 fractall_LDFLAGS =  -lm
 
+if HAVE_OPENMP
+AM_CFLAGS += $(OPENMP_CFLAGS)
+fractall_LDFLAGS += $(OPENMP_CFLAGS)
+endif
+
 fractall_LDADD =  \
 	$(IlmBase_LIBS) \
 	$(ILMBASE_LIBS)

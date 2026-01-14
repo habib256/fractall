@@ -659,6 +659,9 @@ ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
+HAVE_OPENMP_FALSE
+HAVE_OPENMP_TRUE
+OPENMP_CFLAGS
 HAVE_GMP_FALSE
 HAVE_GMP_TRUE
 SDL_LIBS
@@ -805,6 +808,7 @@ with_sdl_prefix
 with_sdl_exec_prefix
 enable_sdltest
 with_gmp
+enable_openmp
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1460,6 +1464,8 @@ Optional Features:
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
   --disable-sdltest       do not try to compile and run a test SDL program
+  --disable-openmp        Disable OpenMP parallel support
+  --disable-openmp        do not use OpenMP
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -13920,6 +13926,120 @@ else
 printf "%s\n" "$as_me: GMP support disabled - zoom will be limited by double precision" >&6;}
 fi
 
+# Check whether --enable-openmp was given.
+if test ${enable_openmp+y}
+then :
+  enableval=$enable_openmp; enable_openmp=$enableval
+else $as_nop
+  enable_openmp=yes
+fi
+
+
+if test "x$enable_openmp" != "xno"; then
+    if test -e penmp || test -e mp; then
+  as_fn_error $? "AC_OPENMP clobbers files named 'mp' and 'penmp'. Aborting configure because one of these files already exists." "$LINENO" 5
+fi
+# Check whether --enable-openmp was given.
+if test ${enable_openmp+y}
+then :
+  enableval=$enable_openmp;
+fi
+
+  OPENMP_CFLAGS=
+  if test "$enable_openmp" != no; then
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $CC option to support OpenMP" >&5
+printf %s "checking for $CC option to support OpenMP... " >&6; }
+if test ${ac_cv_prog_c_openmp+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  ac_cv_prog_c_openmp='not found'
+                                                                        for ac_option in '' -fopenmp -xopenmp -openmp -mp -omp -qsmp=omp -homp \
+                       -Popenmp --openmp; do
+
+        ac_save_CFLAGS=$CFLAGS
+        CFLAGS="$CFLAGS $ac_option"
+        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#ifndef _OPENMP
+#error "OpenMP not supported"
+#endif
+#include <omp.h>
+int main (void) { return omp_get_num_threads (); }
+
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#ifndef _OPENMP
+#error "OpenMP not supported"
+#endif
+#include <omp.h>
+int main (void) { return omp_get_num_threads (); }
+
+_ACEOF
+if ac_fn_c_try_link "$LINENO"
+then :
+  ac_cv_prog_c_openmp=$ac_option
+else $as_nop
+  ac_cv_prog_c_openmp='unsupported'
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+        CFLAGS=$ac_save_CFLAGS
+
+        if test "$ac_cv_prog_c_openmp" != 'not found'; then
+          break
+        fi
+      done
+      if test "$ac_cv_prog_c_openmp" = 'not found'; then
+        ac_cv_prog_c_openmp='unsupported'
+      elif test "$ac_cv_prog_c_openmp" = ''; then
+        ac_cv_prog_c_openmp='none needed'
+      fi
+                        rm -f penmp mp
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_prog_c_openmp" >&5
+printf "%s\n" "$ac_cv_prog_c_openmp" >&6; }
+    if test "$ac_cv_prog_c_openmp" != 'unsupported' && \
+       test "$ac_cv_prog_c_openmp" != 'none needed'; then
+      OPENMP_CFLAGS="$ac_cv_prog_c_openmp"
+    fi
+  fi
+
+
+    if test "x$OPENMP_CFLAGS" != "x"; then
+
+printf "%s\n" "#define HAVE_OPENMP 1" >>confdefs.h
+
+        have_openmp=yes
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: OpenMP support enabled" >&5
+printf "%s\n" "$as_me: OpenMP support enabled" >&6;}
+    else
+        have_openmp=no
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: OpenMP not found - parallel computation disabled" >&5
+printf "%s\n" "$as_me: OpenMP not found - parallel computation disabled" >&6;}
+    fi
+else
+    have_openmp=no
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: OpenMP support disabled by user" >&5
+printf "%s\n" "$as_me: OpenMP support disabled by user" >&6;}
+fi
+
+ if test "x$have_openmp" = "xyes"; then
+  HAVE_OPENMP_TRUE=
+  HAVE_OPENMP_FALSE='#'
+else
+  HAVE_OPENMP_TRUE='#'
+  HAVE_OPENMP_FALSE=
+fi
+
+
 
 
 
@@ -14067,6 +14187,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${HAVE_GMP_TRUE}" && test -z "${HAVE_GMP_FALSE}"; then
   as_fn_error $? "conditional \"HAVE_GMP\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${HAVE_OPENMP_TRUE}" && test -z "${HAVE_OPENMP_FALSE}"; then
+  as_fn_error $? "conditional \"HAVE_OPENMP\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

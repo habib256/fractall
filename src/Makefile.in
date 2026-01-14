@@ -97,6 +97,8 @@ bin_PROGRAMS = fractall$(EXEEXT)
 @HAVE_GMP_TRUE@	gmp_pool.c \
 @HAVE_GMP_TRUE@	gmp_pool.h
 
+@HAVE_OPENMP_TRUE@am__append_2 = $(OPENMP_CFLAGS)
+@HAVE_OPENMP_TRUE@am__append_3 = $(OPENMP_CFLAGS)
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/acinclude.m4 \
@@ -252,6 +254,7 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENMP_CFLAGS = @OPENMP_CFLAGS@
 OTOOL = @OTOOL@
 OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
@@ -334,15 +337,13 @@ AM_CPPFLAGS = \
 	-DPACKAGE_SRC_DIR=\""$(srcdir)"\" \
 	-DPACKAGE_DATA_DIR=\""$(pkgdatadir)"\"
 
-AM_CFLAGS = \
-	 -g
-
+AM_CFLAGS = -g $(am__append_2)
 fractall_SOURCES = main.c complexmath.c complexmath.h EscapeTime.c \
 	EscapeTime.h exception.c exception.h SDL_gfxPrimitives.c \
 	SDL_gfxPrimitives.h SDL_gfxPrimitives_font.h SDLGUI.c SDLGUI.h \
 	SDL_imageFilter.c SDL_imageFilter.h SDL_rotozoom.c \
 	SDL_rotozoom.h VonKoch.c VonKoch.h $(am__append_1)
-fractall_LDFLAGS = -lm
+fractall_LDFLAGS = -lm $(am__append_3)
 fractall_LDADD = \
 	$(IlmBase_LIBS) \
 	$(ILMBASE_LIBS)

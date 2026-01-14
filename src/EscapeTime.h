@@ -10,6 +10,9 @@
 #include "config.h"
 #include "SDL.h"
 #include "complexmath.h"
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
 #ifdef HAVE_GMP
 #include <gmp.h>
 #include "complexmath_gmp.h"

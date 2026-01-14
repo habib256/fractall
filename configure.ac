@@ -60,6 +60,31 @@ else
     AC_MSG_NOTICE([GMP support disabled - zoom will be limited by double precision])
 fi
 
+dnl ***************************************************************************
+dnl Check for OpenMP (optional, for parallel computation)
+dnl ***************************************************************************
+AC_ARG_ENABLE([openmp],
+    [AS_HELP_STRING([--disable-openmp], [Disable OpenMP parallel support])],
+    [enable_openmp=$enableval],
+    [enable_openmp=yes])
+
+if test "x$enable_openmp" != "xno"; then
+    AC_OPENMP
+    if test "x$OPENMP_CFLAGS" != "x"; then
+        AC_DEFINE([HAVE_OPENMP], [1], [Define if OpenMP is available])
+        have_openmp=yes
+        AC_MSG_NOTICE([OpenMP support enabled])
+    else
+        have_openmp=no
+        AC_MSG_NOTICE([OpenMP not found - parallel computation disabled])
+    fi
+else
+    have_openmp=no
+    AC_MSG_NOTICE([OpenMP support disabled by user])
+fi
+
+AM_CONDITIONAL([HAVE_OPENMP], [test "x$have_openmp" = "xyes"])
+
 
 
 
