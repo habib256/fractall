@@ -49,6 +49,11 @@ static double calculate_zoom_factor(fractal* f) {
 	return base_range / current_range;
 }
 
+// Helper pour déterminer si un type est Lyapunov (17 uniquement)
+static int is_lyapunov_type(int type) {
+	return (type == 17);
+}
+
 typedef struct { // Conteneur graphique en 3 parties
 	int y1, y2;
 	int w,h;
@@ -274,9 +279,23 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				if (*typeFractale >= 3) {
 					if (*typeFractale == 16) {
 						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
-					} else if (*typeFractale == 17) {
-						// Lyapunov utilise sa propre fonction de rendu avec coloration intégrée
-						*renderTime = Lyapunov_Draw (screen, f, 0, win.y1, g);
+					} else if (is_lyapunov_type(*typeFractale)) {
+						// Le type Lyapunov (17) : recalculer seulement la colorisation
+						int dummyProgress = 0;
+						Fractal_CalculateColorMatrix(f, screen, NULL, &dummyProgress, 0, 100);
+						// Redessiner la fractale avec les nouvelles couleurs
+						int i, j;
+						Uint8 r, g_color, b;
+						for (i=0; i<f->xpixel; i++) {
+							for (j=0; j<f->ypixel; j++) {
+								r=Fractal_ReadColorMatrixRed (*f,i,j);
+								g_color=Fractal_ReadColorMatrixGreen (*f,i,j);
+								b=Fractal_ReadColorMatrixBlue (*f,i,j);
+								pixelRGBA(screen, (Sint16) (i), (Sint16) (j+win.y1),  r, g_color,  b, 255);
+							}
+						}
+						SDL_UpdateRect (screen, 0, 0, screen->w, screen->h);
+						*renderTime = 0; // Pas de nouveau calcul, juste changement de palette
 					} else {
 						// Recalculer seulement la colorisation (sans progression car rapide)
 						int dummyProgress = 0;
@@ -299,6 +318,57 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					centerY = (f->ymin + f->ymax) / 2;
 					if (g != NULL)
 						SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
+				}
+			}
+			if (event->key.keysym.sym == SDLK_r)
+			{			// Changer nombre de répétitions du gradient (2, 4, 6, 8, 10, 12, 14, 16, 18, 20)
+				// Valeurs possibles : 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 (de 2 en 2)
+				// Trouver la prochaine valeur paire dans la séquence
+				int current = f->colorRepeat;
+				int next = ((current / 2) % 10 + 1) * 2;  // Cycle : 2, 4, 6, 8, 10, 12, 14, 16, 18, 20
+				f->colorRepeat = next;
+				f->cmatrix_valid = 0;  // Invalider pour forcer le recalcul
+				printf ("Répétitions du gradient: %d\n", f->colorRepeat);
+				if (*typeFractale >= 3) {
+					if (*typeFractale == 16) {
+						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+					} else if (is_lyapunov_type(*typeFractale)) {
+						// Le type Lyapunov (17) : recalculer seulement la colorisation
+						int dummyProgress = 0;
+						Fractal_CalculateColorMatrix(f, screen, NULL, &dummyProgress, 0, 100);
+						// Redessiner la fractale avec les nouvelles couleurs
+						int i, j;
+						Uint8 r, g_color, b;
+						for (i=0; i<f->xpixel; i++) {
+							for (j=0; j<f->ypixel; j++) {
+								r=Fractal_ReadColorMatrixRed (*f,i,j);
+								g_color=Fractal_ReadColorMatrixGreen (*f,i,j);
+								b=Fractal_ReadColorMatrixBlue (*f,i,j);
+								pixelRGBA(screen, (Sint16) (i), (Sint16) (j+win.y1),  r, g_color,  b, 255);
+							}
+						}
+						SDL_UpdateRect (screen, 0, 0, screen->w, screen->h);
+						*renderTime = 0; // Pas de nouveau calcul, juste changement de répétitions
+					} else {
+						// Recalculer seulement la colorisation (sans progression car rapide)
+						int dummyProgress = 0;
+						Fractal_CalculateColorMatrix(f, screen, NULL, &dummyProgress, 0, 100);
+						// Redessiner la fractale avec les nouvelles couleurs
+						int i, j;
+						Uint8 r, g_color, b;
+						for (i=0; i<f->xpixel; i++) {
+							for (j=0; j<f->ypixel; j++) {
+								r=Fractal_ReadColorMatrixRed (*f,i,j);
+								g_color=Fractal_ReadColorMatrixGreen (*f,i,j);
+								b=Fractal_ReadColorMatrixBlue (*f,i,j);
+								pixelRGBA(screen, (Sint16) (i), (Sint16) (j+win.y1),  r, g_color,  b, 255);
+							}
+						}
+						SDL_UpdateRect (screen, 0, 0, screen->w, screen->h);
+						*renderTime = 0; // Pas de nouveau calcul, juste changement de répétitions
+					}
+					centerX = (f->xmin + f->xmax) / 2;
+					centerY = (f->ymin + f->ymax) / 2;
 				}
 			}
 
@@ -356,14 +426,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
 				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 			}
-			if (event->key.keysym.sym == SDLK_F8)
-			{
-				*typeFractale = 8;
-				Fractal_ChangeType (f, 8);
-				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
-				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
-				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
-			}
+			// F8 supprimé (Sierpinski)
 			if (event->key.keysym.sym == SDLK_F9)
 			{
 				*typeFractale = 13;
@@ -450,8 +513,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					break;
 					case 17:
 					{
-					Fractal_ChangeType (f, 17);
-					*renderTime = Lyapunov_Draw (screen, f, 0, win.y1, g);
+					Fractal_ChangeType (f, *typeFractale);
+					*renderTime = Fractal_Draw (screen, *f, 0, win.y1, g);
 					centerX = (f->xmin + f->xmax) / 2;
 					centerY = (f->ymin + f->ymax) / 2;
 					SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
@@ -1012,11 +1075,14 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 						}
 #endif
 					}
+					// Réinitialiser cmatrix_valid pour forcer le recalcul après zoom
+					f->cmatrix_valid = 0;
+					
 					// Buddhabrot et Lyapunov utilisent leur propre algorithme de rendu
 					if (*typeFractale == 16) {
 						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
-					} else if (*typeFractale == 17) {
-						*renderTime = Lyapunov_Draw (screen, f, 0, win.y1, g);
+					} else if (is_lyapunov_type(*typeFractale)) {
+						*renderTime = Fractal_Draw (screen, *f, 0, win.y1, g);
 					} else {
 						*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 					}

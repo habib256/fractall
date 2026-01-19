@@ -108,10 +108,10 @@ void SDLGUI_Button_Draw (SDL_Surface* screen, gui* g, int xplace) {
   break;
   case 17:
   {
-  	// Lyapunov utilise son propre algorithme de rendu
+  	// Le type Lyapunov (17) utilise son propre algorithme de rendu
   	fractal f;
-	f = Fractal_Init (g->buttonSize-4, g->buttonSize-4, 17);
-	Lyapunov_Draw (screen, &f, xplace+2, 4, NULL);  // NULL = pas de progression pour le bouton
+	f = Fractal_Init (g->buttonSize-4, g->buttonSize-4, SDLGUI_ButtonNumberRead (g, xplace)+1);
+	Fractal_Draw (screen, f, xplace+2, 4, NULL);  // NULL = pas de progression pour le bouton
 	Fractal_Destroy (f);
   }
   break;
@@ -179,7 +179,7 @@ void SDLGUI_Draw3DBox (SDL_Surface *surface, int x, int y, int w, int h, Uint32 
 
 void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMode, double centerX, double centerY, double zoomFactor, Uint32 renderTime, fractal* f) {
 	const char* typeNames[] = {"", "Von Koch", "Dragon", "Mandelbrot", "Julia", "Julia Sin",
-		"Newton", "Phoenix", "Sierpinski", "Barnsley J", "Barnsley M",
+		"Newton", "Phoenix", "", "Barnsley J", "Barnsley M",
 		"Magnet J", "Magnet M", "Burning Ship", "Tricorn", "Mandelbulb", "Buddhabrot"};
 	const char* paletteNames[] = {"SmoothFire", "SmoothOcean", "SmoothForest", "SmoothViolet", "SmoothRainbow"};
 	char statusText[256];

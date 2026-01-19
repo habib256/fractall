@@ -50,12 +50,13 @@ fractall [OPTIONS]
 
 | Touche | Effet |
 |--------|-------|
-| **F1-F8** | Von Koch, Dragon, Mandelbrot, Julia, Julia Sin, Newton, Phoenix, Sierpinski |
+| **F1-F7** | Von Koch, Dragon, Mandelbrot, Julia, Julia Sin, Newton, Phoenix |
 | **F9-F12** | Burning Ship, Tricorn, Mandelbulb, Buddhabrot |
 | **GUI** | 17 boutons pour sélectionner toutes les fractales (types 1-17) |
 | **Clic gauche** | Zoom / +1 itération (vectorielles) |
 | **Clic droit** | Dézoom / -1 itération |
 | **C** | Changer palette |
+| **R** | Changer nombre de répétitions du gradient (2, 4, 6, 8, 10, 12, 14, 16, 18, 20) |
 | **S** | Screenshot (Screenshot.bmp) |
 | **Q/ESC** | Quitter |
 
@@ -92,7 +93,7 @@ src/
 | 5 | Julia Sin | z(n+1) = c × sin(z(n)) |
 | 6 | Newton | z(n+1) = ((p-1)×z^p + 1) / (p×z^(p-1)) |
 | 7 | Phoenix | z(n+1) = z(n)² + p1 + p2×y(n) |
-| 8 | Sierpinski | Transformation conditionnelle |
+| 8 | *(supprimé)* | - |
 | 9 | Barnsley J | z(n+1) = (z±1)×c selon Re(z) |
 | 10 | Barnsley M | Variante Mandelbrot de Barnsley |
 | 11 | Magnet J | Formule magnétique (Julia) |
@@ -101,7 +102,7 @@ src/
 | 14 | Tricorn | z(n+1) = conj(z)² + c |
 | 15 | Mandelbulb | z(n+1) = z(n)⁸ + c |
 | 16 | Buddhabrot | Densité des trajectoires d'échappement |
-| 17 | Lyapunov | Exposant de Lyapunov de la suite logistique |
+| 17 | Lyapunov Zircon City | Exposant de Lyapunov (séquence "BBBBBBAAAAAA", domaine [2.5, 3.4] × [3.4, 4.0]) |
 
 **Note** : F9-F12 mappent vers les types 13-16 (les types 9-12 et 17 sont accessibles via GUI).
 
@@ -115,15 +116,16 @@ Algorithme de densité différent :
 
 ### Lyapunov (Type 17)
 
-Algorithme basé sur l'exposant de Lyapunov :
-1. Calcule l'exposant de Lyapunov de la suite logistique x_{n+1} = r_n × x_n × (1 - x_n)
-2. Le paramètre r alterne entre a (axe X) et b (axe Y) selon la séquence "AB"
-3. Phase de stabilisation (warmup) de 50 itérations
-4. Calcul de l'exposant sur 200 itérations par défaut
-5. Coloration :
-   - Exposant négatif (stable) : gradient bleu → cyan → jaune
-   - Exposant positif (chaotique) : noir
-6. Domaine classique : a et b entre 2.0 et 4.0
+Algorithme basé sur l'exposant de Lyapunov de la suite logistique x_{n+1} = r_n × x_n × (1 - x_n) :
+
+**Principe** :
+1. Le paramètre r alterne entre a (axe X) et b (axe Y) selon la séquence "BBBBBBAAAAAA"
+2. Phase de stabilisation (warmup) de 50 itérations
+3. Calcul de l'exposant sur 2000 itérations par défaut
+4. Coloration avec palettes (SmoothFire par défaut, 2 répétitions par défaut)
+5. Domaine : [2.5, 3.4] × [3.4, 4.0] (image de référence classique "Zircon City")
+
+**Note** : Les variantes Lyapunov 18-27 ont été supprimées. Seule Zircon City (type 17) est conservée.
 
 ## Palettes de couleurs
 
@@ -139,7 +141,7 @@ Algorithme basé sur l'exposant de Lyapunov :
 
 Toutes utilisent une interpolation continue basée sur |z| et alternent endroit/envers pour éviter les transitions brutales.
 
-**Note** : Buddhabrot et Lyapunov ont leur propre algorithme de coloration et ne sont pas affectés par le changement de palette.
+**Note** : Buddhabrot a son propre algorithme de coloration et n'est pas affecté par le changement de palette. La fractale de Lyapunov (type 17) supporte maintenant toutes les palettes disponibles (touche C).
 
 ## Structure principale
 
@@ -238,8 +240,8 @@ main()
 - GUI : 51px en haut, barre d'état : 20px en bas
 - 17 boutons dans le GUI (types 1-17)
 - `Buddhabrot_Draw()` pour le type 16 (algorithme de densité)
-- `Lyapunov_Draw()` pour le type 17 (algorithme d'exposant de Lyapunov)
-- `Fractal_Draw()` détecte automatiquement les types 16 et 17 et appelle leurs fonctions spécialisées
+- `Lyapunov_Draw()` pour le type 17 (algorithme d'exposant de Lyapunov - Zircon City)
+- `Fractal_Draw()` détecte automatiquement les types 16-17 et appelle leurs fonctions spécialisées
 - `Fractal_GetTypeName()` retourne le nom selon le type (0-17)
 - OpenMP : `HAVE_OPENMP` défini dans `config.h` si disponible
 - SIMD : `HAVE_SSE4_1`, `HAVE_AVX`, `HAVE_AVX2` définis selon le support CPU

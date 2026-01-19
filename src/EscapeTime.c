@@ -45,9 +45,15 @@ fractal Fractal_Init (int screenW, int screenH, int type) {
 	f.xpixel = screenW;
 	f.ypixel = screenH;
 	f.type = type;
-	f.colorMode = 4;  // SmoothRainbow par défaut
+	f.colorMode = 0;  // SmoothFire par défaut
 	f.cmatrix_valid = 0;
 	f.last_colorMode = -1;
+	// Répétition par défaut selon le type : 20 pour escape-time, 2 pour Lyapunov
+	if (type == 17) {
+		f.colorRepeat = 2;  // 2 répétitions pour Lyapunov
+	} else {
+		f.colorRepeat = 20;  // 20 répétitions pour escape-time
+	}
 	f.zoom_level = 1.0;  // Niveau de zoom initial
 	// Initialiser le cache
 	f.cache.cache_valid = 0;
@@ -324,6 +330,7 @@ static void Fractal_CalculateMatrix_DDp1_GMP (fractal* f, SDL_Surface* canvas, v
 		f_local.colorMode = f->colorMode;
 		f_local.cmatrix_valid = f->cmatrix_valid;
 		f_local.last_colorMode = f->last_colorMode;
+		f_local.colorRepeat = f->colorRepeat;
 		f_local.zoom_level = f->zoom_level;
 		f_local.fmatrix = f->fmatrix;  // Partagé en écriture (mais chaque thread écrit à des indices différents)
 		f_local.zmatrix = f->zmatrix;  // Partagé en écriture
@@ -786,6 +793,7 @@ static void Fractal_CalculateMatrix_DDp2_GMP (fractal* f, SDL_Surface* canvas, v
 		f_local.colorMode = f->colorMode;
 		f_local.cmatrix_valid = f->cmatrix_valid;
 		f_local.last_colorMode = f->last_colorMode;
+		f_local.colorRepeat = f->colorRepeat;
 		f_local.zoom_level = f->zoom_level;
 		f_local.fmatrix = f->fmatrix;
 		f_local.zmatrix = f->zmatrix;
@@ -1002,6 +1010,7 @@ static void Fractal_CalculateMatrix_DDp2_GMP (fractal* f, SDL_Surface* canvas, v
 		f_local.colorMode = f->colorMode;
 		f_local.cmatrix_valid = f->cmatrix_valid;
 		f_local.last_colorMode = f->last_colorMode;
+		f_local.colorRepeat = f->colorRepeat;
 		f_local.zoom_level = f->zoom_level;
 		f_local.fmatrix = f->fmatrix;
 		f_local.zmatrix = f->zmatrix;
@@ -1437,6 +1446,13 @@ void FractalColorTest (fractal* f) {
 /* Calcul smooth iteration pour coloring continu */
 double Fractal_SmoothIteration(fractal* f, int i, int j) {
 	int iteration = *((f->fmatrix)+((f->xpixel*j)+i));
+	
+	// Pour le type Lyapunov (17), retourner directement la valeur normalisée
+	// qui est déjà stockée dans fmatrix comme "nombre d'itérations"
+	if (f->type == 17) {
+		return (double)iteration / f->iterationMax;
+	}
+	
 	complex z = *((f->zmatrix)+((f->xpixel*j)+i));
 	double mag = Magz(z);
 
@@ -1505,9 +1521,10 @@ void FractalColorSmoothFire(fractal* f) {
 		int i;
 		for (i = 0; i < xpixel; i++) {
 			double t = Fractal_SmoothIteration(f, i, j);
-			// Répéter la palette 40 fois de 0 au bailout
-			double cycle = floor(t * 40.0);
-			double t_repeat = fmod(t * 40.0, 1.0);
+			// Répéter la palette selon colorRepeat de 0 au bailout
+			double repeatCount = (double)f->colorRepeat;
+			double cycle = floor(t * repeatCount);
+			double t_repeat = fmod(t * repeatCount, 1.0);
 			color c;
 			// Alterner entre l'endroit et l'envers pour éviter les transitions brutales
 			if ((int)cycle % 2 == 1) {
@@ -1551,9 +1568,10 @@ void FractalColorSmoothOcean(fractal* f) {
 		int i;
 		for (i = 0; i < xpixel; i++) {
 			double t = Fractal_SmoothIteration(f, i, j);
-			// Répéter la palette 40 fois de 0 au bailout
-			double cycle = floor(t * 40.0);
-			double t_repeat = fmod(t * 40.0, 1.0);
+			// Répéter la palette selon colorRepeat de 0 au bailout
+			double repeatCount = (double)f->colorRepeat;
+			double cycle = floor(t * repeatCount);
+			double t_repeat = fmod(t * repeatCount, 1.0);
 			color c;
 			// Alterner entre l'endroit et l'envers pour éviter les transitions brutales
 			if ((int)cycle % 2 == 1) {
@@ -1597,8 +1615,10 @@ void FractalColorSmoothForest(fractal* f) {
 		int i;
 		for (i = 0; i < xpixel; i++) {
 			double t = Fractal_SmoothIteration(f, i, j);
-			double cycle = floor(t * 40.0);
-			double t_repeat = fmod(t * 40.0, 1.0);
+			// Répéter la palette selon colorRepeat de 0 au bailout
+			double repeatCount = (double)f->colorRepeat;
+			double cycle = floor(t * repeatCount);
+			double t_repeat = fmod(t * repeatCount, 1.0);
 			color c;
 			if ((int)cycle % 2 == 1) {
 				t_repeat = 1.0 - t_repeat;
@@ -1644,8 +1664,10 @@ void FractalColorSmoothViolet(fractal* f) {
 		int i;
 		for (i = 0; i < xpixel; i++) {
 			double t = Fractal_SmoothIteration(f, i, j);
-			double cycle = floor(t * 40.0);
-			double t_repeat = fmod(t * 40.0, 1.0);
+			// Répéter la palette selon colorRepeat de 0 au bailout
+			double repeatCount = (double)f->colorRepeat;
+			double cycle = floor(t * repeatCount);
+			double t_repeat = fmod(t * repeatCount, 1.0);
 			color c;
 			if ((int)cycle % 2 == 1) {
 				t_repeat = 1.0 - t_repeat;
@@ -1704,8 +1726,10 @@ void FractalColorSmoothRainbow(fractal* f) {
 			}
 
 			double t = Fractal_SmoothIteration(f, i, j);
-			double cycle = floor(t * 40.0);
-			double t_repeat = fmod(t * 40.0, 1.0);
+			// Répéter la palette selon colorRepeat de 0 au bailout
+			double repeatCount = (double)f->colorRepeat;
+			double cycle = floor(t * repeatCount);
+			double t_repeat = fmod(t * repeatCount, 1.0);
 			if ((int)cycle % 2 == 1) {
 				t_repeat = 1.0 - t_repeat;
 			}
@@ -1760,7 +1784,7 @@ void Fractal_CalculateColorMatrix (fractal* f, SDL_Surface* canvas, void* guiPtr
 	if (progressInterval < 1) progressInterval = 1;
 	const char* fractalName = Fractal_GetTypeName(f->type);
 
-	// Réutilisation de cmatrix si déjà valide pour le colorMode actuel
+	// Réutilisation de cmatrix si déjà valide pour le colorMode et colorRepeat actuel
 	if (f->cmatrix_valid && f->last_colorMode == f->colorMode) {
 		// Sauter le calcul, mettre à jour la progression directement
 		if (guiPtr != NULL && progress != NULL) {
@@ -1970,6 +1994,13 @@ void Fractal_ChangeType (fractal* f, int type) {
 	f->type = type;
 	printf ("On initialise une EscapeTimeFractal de type %d\n",type);
 
+	// Définir la répétition par défaut selon le type
+	if (type == 17) {
+		f->colorRepeat = 2;  // 2 répétitions pour Lyapunov
+	} else {
+		f->colorRepeat = 20;  // 20 répétitions pour escape-time
+	}
+
 	switch (type)
 	{
 	case 3:
@@ -1988,7 +2019,8 @@ void Fractal_ChangeType (fractal* f, int type) {
 	Phoenix_def (f);
 	break;
 	case 8:
-	Sierpinski_def (f);
+	// Type 8 supprimé (Sierpinski)
+	Mendelbrot_def (f);
 	break;
 	case 9:
 	Barnsley1j_def (f);
@@ -2086,7 +2118,7 @@ const char* Fractal_GetTypeName(int type) {
 		"Julia Sin",  // 5
 		"Newton",     // 6
 		"Phoenix",    // 7
-		"Sierpinski", // 8
+		"",           // 8 (supprimé)
 		"Barnsley J", // 9
 		"Barnsley M", // 10
 		"Magnet J",   // 11
@@ -2095,7 +2127,7 @@ const char* Fractal_GetTypeName(int type) {
 		"Tricorn",    // 14
 		"Mandelbulb", // 15
 		"Buddhabrot", // 16
-		"Lyapunov"    // 17
+		"Lyapunov Zircon City"   // 17
 	};
 
 	if (type >= 0 && type <= 17) {
@@ -2291,43 +2323,7 @@ void Phoenix_def (fractal* f) {
 
 
 
-/* Calcul de la Sierpinski */
-fractalresult Sierpinski_Iteration (fractal f, complex zPixel) {
-	/*
-	 * z(n+1) = (2*x, 2*y-1) if y>0.5;
-	 * else (2*x-1,2*y) if x> 0.5;
-	 * else (2*x,2*y)
-	 */
-	int i=0;
-	complex z;
-	fractalresult result;
-	z = zPixel;
-	do {
-		i++;
-		if (Imz(z) > 0.5) {
-			z = MakeComplex (2*Rez(z),(2*Imz(z))-1);
-		} else {
-			if (Rez(z) > 0.5) {
-				z = MakeComplex ((2*Rez(z))-1,2*Imz(z));
-			} else {
-				z = MakeComplex (2*Rez(z),2*Imz(z));
-			}
-		}
-	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
-	result.iteration = i;
-	result.z = z;
-	return result;
-}
-void Sierpinski_def (fractal* f) {
-	/* Valeurs de base pour la Sierpinski */
-	f->xmin = -1.333402669;
-	f->xmax = 2.133402669;
-	f->ymin = -0.9000520021;  // Corrigé : ymin doit être < ymax
-	f->ymax = 1.700052002;     // Corrigé : ymax doit être > ymin
-	f->bailout= 127;
-	f->iterationMax= 9310;
-	f->zoomfactor = 4;
-}
+/* Sierpinski supprimé - type 8 */
 
 /* Calcul de Barnsley1j  */
 fractalresult Barnsley1j_Iteration ( fractal f, complex zPixel) {
@@ -2843,10 +2839,11 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 // *************************************************************************
 
 void Lyapunov_def (fractal* f) {
-	/* Domaine classique pour Lyapunov : a et b entre 2.0 et 4.0 */
-	f->xmin = 2.0;
-	f->xmax = 4.0;
-	f->ymin = 2.0;
+	/* Zircon City : Lyapunov fractal pour la séquence bbbbbbaaaaaa
+	 * Domaine : (a, b) ∈ [2.5, 3.4] × [3.4, 4.0] */
+	f->xmin = 2.5;
+	f->xmax = 3.4;
+	f->ymin = 3.4;
 	f->ymax = 4.0;
 	f->seed = ZeroSetofComplex();
 	f->bailout = 4;
@@ -2854,23 +2851,44 @@ void Lyapunov_def (fractal* f) {
 	f->zoomfactor = 2;
 }
 
-/* Fonction de rendu spéciale pour Lyapunov
- * Calcule l'exposant de Lyapunov de la suite logistique x_{n+1} = r_n * x_n * (1 - x_n)
- * avec r alternant entre a (x) et b (y) selon la séquence "AB"
+/* Fonction de normalisation de l'exposant de Lyapunov
+ * Convertit l'exposant en une valeur normalisée (0.0-1.0) pour les palettes
+ * - Zones stables (lyap < 0) : mapper vers 0.0-0.85
+ * - Zones chaotiques (lyap >= 0) : mapper vers 0.85-1.0
  */
-Uint32 Lyapunov_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decalageY, void* guiPtr) {
+static double Lyapunov_GetNormalizedValue(double lyap) {
+	if (lyap < 0) {
+		// Exposant négatif = stable
+		// Normaliser entre 0.0 et 0.85 (éviter 1.0 pour distinguer du chaos)
+		double t = -lyap;
+		if (t > 2.0) t = 2.0;  // Limiter à 2.0
+		return (t / 2.0) * 0.85;  // 0.0 à 0.85
+	} else {
+		// Exposant positif = chaotique
+		// Normaliser entre 0.85 et 1.0
+		double t = lyap;
+		if (t > 1.0) t = 1.0;  // Limiter à 1.0
+		return 0.85 + (t * 0.15);  // 0.85 à 1.0
+	}
+}
+
+/* Fonction générique de rendu pour Lyapunov avec séquence paramétrable
+ * Calcule l'exposant de Lyapunov de la suite logistique x_{n+1} = r_n * x_n * (1 - x_n)
+ * avec r alternant entre a (x) et b (y) selon la séquence fournie
+ */
+static Uint32 Lyapunov_Draw_Sequence (SDL_Surface *canvas, fractal* f, int decalageX, int decalageY, void* guiPtr, const char* sequence, const char* fractalName) {
 	int i, j;
 	double xStep, yStep;
 	Uint32 time;
-	const char* sequence = "AB";  // Séquence de Lyapunov classique
-	int seqLen = 2;
+	int seqLen = strlen(sequence);
 	int warmup = 50;  // Itérations de stabilisation
 	int iterMax = f->iterationMax;
 	int xpixel = f->xpixel;
 	int ypixel = f->ypixel;
 
 	time = SDL_GetTicks();
-	printf("Calculating Lyapunov fractal...\n");
+	printf("Calculating %s fractal (sequence: %s)...\n", fractalName, sequence);
+	printf("Domain: x=[%.6f, %.6f] y=[%.6f, %.6f]\n", f->xmin, f->xmax, f->ymin, f->ymax);
 #ifdef HAVE_OPENMP
 	printf("Using OpenMP with %d threads\n", omp_get_max_threads());
 #endif
@@ -2891,7 +2909,6 @@ Uint32 Lyapunov_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decala
 			double lyap = 0.0;
 			double r;
 			int n;
-			color col;
 
 			// Phase de stabilisation (warmup)
 			for (n = 0; n < warmup; n++) {
@@ -2919,39 +2936,30 @@ Uint32 Lyapunov_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decala
 
 			lyap /= iterMax;
 
-			// Stocker l'exposant (multiplié par 1000 pour précision en int)
-			f->fmatrix[j * xpixel + i] = (int)(lyap * 1000);
-
-			// Coloration basée sur l'exposant de Lyapunov
-			if (lyap < 0) {
-				// Exposant négatif = stable = couleurs vives
-				double t = -lyap;
-				if (t > 2.0) t = 2.0;
-				t = t / 2.0;  // Normaliser entre 0 et 1
-
-				// Gradient : bleu → cyan → jaune
-				if (t < 0.5) {
-					col.r = 0;
-					col.g = (int)(t * 2 * 255);
-					col.b = 255;
-				} else {
-					col.r = (int)((t - 0.5) * 2 * 255);
-					col.g = 255;
-					col.b = 255 - (int)((t - 0.5) * 2 * 255);
-				}
-			} else {
-				// Exposant positif = chaotique = noir
-				col.r = 0;
-				col.g = 0;
-				col.b = 0;
-			}
-
-			// Stocker la couleur dans cmatrix
-			f->cmatrix[j * xpixel + i] = col;
+			// Convertir l'exposant en valeur normalisée pour les palettes
+			double normalizedValue = Lyapunov_GetNormalizedValue(lyap);
+			
+			// Stocker la valeur normalisée dans fmatrix comme "nombre d'itérations"
+			// Multiplier par iterationMax pour que Fractal_SmoothIteration fonctionne correctement
+			f->fmatrix[j * xpixel + i] = (int)(normalizedValue * iterMax);
+			
+			// Initialiser zmatrix avec une valeur fictive pour les types Lyapunov
+			// On utilise une magnitude basée sur la valeur normalisée pour que Fractal_SmoothIteration
+			// puisse fonctionner correctement
+			complex z_fake;
+			z_fake.x = normalizedValue * 2.0;  // Valeur entre 0 et 2.0
+			z_fake.y = 0.0;
+			f->zmatrix[j * xpixel + i] = z_fake;
 		}
 	}
 
-	// Phase 2: Rendu SDL séquentiel (SDL n'est pas thread-safe)
+	// Phase 2: Calcul de la colorisation avec les palettes
+	// Réinitialiser cmatrix_valid pour forcer le recalcul
+	f->cmatrix_valid = 0;
+	int progress = 0;
+	Fractal_CalculateColorMatrix(f, canvas, guiPtr, &progress, 0, 100);
+
+	// Phase 3: Rendu SDL séquentiel (SDL n'est pas thread-safe)
 	for (j = 0; j < ypixel; j++) {
 		for (i = 0; i < xpixel; i++) {
 			color col = f->cmatrix[j * xpixel + i];
@@ -2964,7 +2972,7 @@ Uint32 Lyapunov_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decala
 			SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
 			if (guiPtr != NULL) {
 				int percent = (j * 100) / ypixel;
-				SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, "Lyapunov");
+				SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
 			}
 		}
 	}
@@ -2972,9 +2980,16 @@ Uint32 Lyapunov_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decala
 	SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
 
 	time = SDL_GetTicks() - time;
-	printf("Lyapunov fractal rendered in %d ms\n", time);
+	printf("%s fractal rendered in %d ms\n", fractalName, time);
 	return time;
 }
+
+/* Fonction de rendu pour Lyapunov Zircon City (séquence "BBBBBBAAAAAA" - 6B puis 6A) */
+Uint32 Lyapunov_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decalageY, void* guiPtr) {
+	return Lyapunov_Draw_Sequence(canvas, f, decalageX, decalageY, guiPtr, "BBBBBBAAAAAA", "Lyapunov Zircon City");
+}
+
+/* Variantes Lyapunov 18-27 supprimées - seule Zircon City (type 17) est conservée */
 
 #ifdef HAVE_GMP
 // ******************************************************
@@ -3226,87 +3241,7 @@ fractalresult Phoenix_Iteration_GMP (fractal f, complex_gmp zPixel) {
 	return result;
 }
 
-fractalresult Sierpinski_Iteration_GMP (fractal f, complex_gmp zPixel) {
-	int i = 0;
-	complex_gmp z, z_new;
-	mpf_t mag, bailout_mpf, z_real, z_imag, two, one_mpf, half_mpf;
-	fractalresult result;
-	
-	mp_bitcnt_t prec = f.gmp_precision;
-	z = complex_gmp_copy(zPixel, prec);
-	
-	mpf_init2(mag, prec);
-	mpf_init2(bailout_mpf, prec);
-	mpf_init2(z_real, prec);
-	mpf_init2(z_imag, prec);
-	mpf_init2(two, prec);
-	mpf_init2(one_mpf, prec);
-	mpf_init2(half_mpf, prec);
-	mpf_set_ui(bailout_mpf, f.bailout);
-	mpf_set_ui(two, 2);
-	mpf_set_ui(one_mpf, 1);
-	mpf_set_d(half_mpf, 0.5);
-	
-	do {
-		i++;
-		complex_gmp_get_real(z_real, z);
-		complex_gmp_get_imag(z_imag, z);
-		
-		if (mpf_cmp(z_imag, half_mpf) > 0) {
-			// z = (2*x, 2*y-1)
-			mpf_t temp_real, temp_imag;
-			mpf_init2(temp_real, prec);
-			mpf_init2(temp_imag, prec);
-			mpf_mul(temp_real, z_real, two);
-			mpf_mul(temp_imag, z_imag, two);
-			mpf_sub(temp_imag, temp_imag, one_mpf);
-			z_new = complex_gmp_make(temp_real, temp_imag, prec);
-			mpf_clear(temp_real);
-			mpf_clear(temp_imag);
-		} else if (mpf_cmp(z_real, half_mpf) > 0) {
-			// z = (2*x-1, 2*y)
-			mpf_t temp_real, temp_imag;
-			mpf_init2(temp_real, prec);
-			mpf_init2(temp_imag, prec);
-			mpf_mul(temp_real, z_real, two);
-			mpf_sub(temp_real, temp_real, one_mpf);
-			mpf_mul(temp_imag, z_imag, two);
-			z_new = complex_gmp_make(temp_real, temp_imag, prec);
-			mpf_clear(temp_real);
-			mpf_clear(temp_imag);
-		} else {
-			// z = (2*x, 2*y)
-			mpf_t temp_real, temp_imag;
-			mpf_init2(temp_real, prec);
-			mpf_init2(temp_imag, prec);
-			mpf_mul(temp_real, z_real, two);
-			mpf_mul(temp_imag, z_imag, two);
-			z_new = complex_gmp_make(temp_real, temp_imag, prec);
-			mpf_clear(temp_real);
-			mpf_clear(temp_imag);
-		}
-		
-		complex_gmp_clear(&z);
-		z = z_new;
-		// Note: z_new est maintenant dans z, donc on ne libère pas z_new séparément
-		
-		complex_gmp_mag(mag, z);
-	} while ((i < f.iterationMax) && (mpf_cmp(mag, bailout_mpf) < 0));
-	
-	result.iteration = i;
-	result.z = gmp_to_complex(z);
-	
-	complex_gmp_clear(&z);
-	mpf_clear(mag);
-	mpf_clear(bailout_mpf);
-	mpf_clear(z_real);
-	mpf_clear(z_imag);
-	mpf_clear(two);
-	mpf_clear(one_mpf);
-	mpf_clear(half_mpf);
-	
-	return result;
-}
+/* Sierpinski_Iteration_GMP supprimé - type 8 */
 
 fractalresult Barnsley1j_Iteration_GMP (fractal f, complex_gmp zPixel) {
 	int i = 0;
@@ -3700,7 +3635,8 @@ fractalresult FormulaSelector_GMP (fractal f, complex_gmp zPixel) {
 		r = Phoenix_Iteration_GMP(f, zPixel);
 		break;
 	case 8:
-		r = Sierpinski_Iteration_GMP(f, zPixel);
+		// Type 8 supprimé (Sierpinski)
+		r = Mendelbrot_Iteration_GMP(f, zPixel);
 		break;
 	case 9:
 		r = Barnsley1j_Iteration_GMP(f, zPixel);
@@ -3763,7 +3699,8 @@ fractalresult FormulaSelector (fractal f, complex zPixel) {
 	r=Phoenix_Iteration (f,zPixel);
 	break;
 	case 8:
-	r=Sierpinski_Iteration (f,zPixel);
+	// Type 8 supprimé (Sierpinski)
+	r = Mendelbrot_Iteration(f, zPixel);
 	break;
 	case 9:
 	r=Barnsley1j_Iteration (f,zPixel);

@@ -7,7 +7,7 @@ A portable fractal explorer written in C using SDL.
 
 ## Features
 
-- **17 fractal types**: Von Koch, Dragon, Mandelbrot, Julia, Newton, Phoenix, Burning Ship, Tricorn, Mandelbulb, Buddhabrot, Lyapunov, and more
+- **17 fractal types**: Von Koch, Dragon, Mandelbrot, Julia, Newton, Phoenix, Burning Ship, Tricorn, Mandelbulb, Buddhabrot, Lyapunov Zircon City, and more
 - **5 smooth color palettes**: SmoothFire, SmoothOcean, SmoothForest, SmoothViolet, SmoothRainbow
 - **Smooth coloring**: Eliminates visible color bands using continuous iteration interpolation
 - **Interactive zoom**: Click to zoom in/out, explore fractal details
@@ -48,10 +48,11 @@ fractall [OPTIONS]
 
 | Key/Action | Effect |
 |------------|--------|
-| **F1-F8** | Von Koch, Dragon, Mandelbrot, Julia, Julia Sin, Newton, Phoenix, Sierpinski |
+| **F1-F7** | Von Koch, Dragon, Mandelbrot, Julia, Julia Sin, Newton, Phoenix |
 | **F9-F12** | Burning Ship, Tricorn, Mandelbulb, Buddhabrot |
 | **GUI buttons** | Select any of the 17 fractal types |
 | **C** | Cycle color palette (5 palettes) |
+| **R** | Cycle gradient repetition (2, 4, 6, 8, 10, 12, 14, 16, 18, 20) |
 | **S** | Screenshot (Screenshot.bmp) |
 | **Q** / **ESC** | Quit |
 | **Left click** | Zoom in / +1 iteration (vector fractals) |
@@ -69,28 +70,27 @@ fractall [OPTIONS]
 - **Julia Sin** - z = c * sin(z)
 - **Newton** - Newton's method fractal
 - **Phoenix** - Phoenix fractal
-- **Sierpinski** - Sierpinski gasket
 - **Barnsley J/M** - Barnsley fractal variants
 - **Magnet J/M** - Magnetic fractal variants
 - **Burning Ship** - Uses absolute values
 - **Tricorn** - Uses complex conjugate
 - **Mandelbulb** - 2D slice of 3D fractal (power 8)
 - **Buddhabrot** - Density-based rendering of escape trajectories
-- **Lyapunov** - Lyapunov exponent of logistic map
+- **Lyapunov Zircon City** - Lyapunov exponent of logistic map (sequence "BBBBBBAAAAAA")
 
 ## Color Palettes
 
 | Palette | Description |
 |---------|-------------|
-| SmoothFire | Black → Red → Yellow → White (smooth gradients, 4× repetition) |
-| SmoothOcean | Black → Blue → Cyan → White (smooth gradients, 4× repetition) |
-| SmoothForest | Black → Green → Yellow → White (smooth gradients, 4× repetition) |
-| SmoothViolet | Black → Violet → Pink → White (smooth gradients, 4× repetition) |
+| SmoothFire | Black → Red → Yellow → White (smooth gradients, configurable repetition) |
+| SmoothOcean | Black → Blue → Cyan → White (smooth gradients, configurable repetition) |
+| SmoothForest | Black → Green → Yellow → White (smooth gradients, configurable repetition) |
+| SmoothViolet | Black → Violet → Pink → White (smooth gradients, configurable repetition) |
 | SmoothRainbow | Full rainbow spectrum (Red → Orange → Yellow → Green → Cyan → Blue → Violet) |
 
-All palettes use continuous iteration interpolation based on |z| to eliminate visible color banding. The palettes alternate forward/reverse to avoid abrupt transitions.
+All palettes use continuous iteration interpolation based on |z| to eliminate visible color banding. The palettes alternate forward/reverse to avoid abrupt transitions. Gradient repetition can be adjusted with the **R** key (default: 20 for escape-time fractals, 2 for Lyapunov).
 
-**Note**: Buddhabrot and Lyapunov fractals have their own specialized coloring algorithms.
+**Note**: Buddhabrot has its own specialized coloring algorithm. Lyapunov Zircon City supports all color palettes.
 
 ## Screenshots
 

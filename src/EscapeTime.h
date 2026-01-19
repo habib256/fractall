@@ -45,6 +45,7 @@ typedef struct {
   int colorMode;   // 0=SmoothFire, 1=SmoothOcean
   int cmatrix_valid;   // 1 si cmatrix est valide pour le colorMode actuel
   int last_colorMode;  // colorMode lors du dernier calcul de cmatrix
+  int colorRepeat;  // Nombre de répétitions du gradient de couleur (2-20, de 2 en 2)
   double zoom_level;   // Niveau de zoom actuel pour détection de changement
   int *fmatrix;    // la matrice d'iteration
   complex *zmatrix;  // la matrice de la valeur de z a la derniere iteration
@@ -100,7 +101,6 @@ void Fractal_ChangeType (fractal* f, int type);
  fractalresult JuliaSin_Iteration (fractal, complex);
  fractalresult Newton_Iteration (fractal, complex);
  fractalresult Phoenix_Iteration (fractal, complex);
- fractalresult Sierpinski_Iteration (fractal, complex);
 fractalresult Barnsleyj1_Iteration (fractal, complex);
 fractalresult Barnsleym1_Iteration (fractal, complex);
 fractalresult BurningShip_Iteration (fractal, complex);
@@ -115,7 +115,6 @@ fractalresult Julia_Iteration_GMP (fractal, complex_gmp);
 fractalresult JuliaSin_Iteration_GMP (fractal, complex_gmp);
 fractalresult Newton_Iteration_GMP (fractal, complex_gmp);
 fractalresult Phoenix_Iteration_GMP (fractal, complex_gmp);
-fractalresult Sierpinski_Iteration_GMP (fractal, complex_gmp);
 fractalresult Barnsleyj1_Iteration_GMP (fractal, complex_gmp);
 fractalresult Barnsleym1_Iteration_GMP (fractal, complex_gmp);
 fractalresult BurningShip_Iteration_GMP (fractal, complex_gmp);
@@ -129,7 +128,6 @@ fractalresult Mandelbulb_Iteration_GMP (fractal, complex_gmp);
  void JuliaSin_def (fractal* f);
  void Newton_def (fractal* f);
  void Phoenix_def (fractal* f);
- void Sierpinski_def (fractal* f);
  void Barnsley1j_def (fractal* f);
 void Barnsley1m_def (fractal* f);
 void Magnet1j_def (fractal* f);
