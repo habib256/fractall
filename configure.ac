@@ -85,6 +85,76 @@ fi
 
 AM_CONDITIONAL([HAVE_OPENMP], [test "x$have_openmp" = "xyes"])
 
+dnl ***************************************************************************
+dnl Check for SIMD support (SSE4.1, AVX, AVX2)
+dnl ***************************************************************************
+AC_ARG_ENABLE([simd],
+    [AS_HELP_STRING([--disable-simd], [Disable SIMD optimizations])],
+    [enable_simd=$enableval],
+    [enable_simd=yes])
+
+have_sse4_1=no
+have_avx=no
+have_avx2=no
+
+if test "x$enable_simd" != "xno"; then
+    # Vérifier SSE4.1
+    AC_MSG_CHECKING([for SSE4.1 support])
+    AC_COMPILE_IFELSE(
+        [AC_LANG_PROGRAM([[
+            #include <smmintrin.h>
+        ]], [[
+            __m128d a = _mm_setzero_pd();
+            __m128d b = _mm_dp_pd(a, a, 0xFF);
+        ]])],
+        [have_sse4_1=yes
+         AC_DEFINE([HAVE_SSE4_1], [1], [Define if SSE4.1 is available])
+         AC_MSG_RESULT([yes])],
+        [AC_MSG_RESULT([no])])
+    
+    # Vérifier AVX
+    AC_MSG_CHECKING([for AVX support])
+    AC_COMPILE_IFELSE(
+        [AC_LANG_PROGRAM([[
+            #include <immintrin.h>
+        ]], [[
+            __m256d a = _mm256_setzero_pd();
+            __m256d b = _mm256_add_pd(a, a);
+        ]])],
+        [have_avx=yes
+         AC_DEFINE([HAVE_AVX], [1], [Define if AVX is available])
+         AC_MSG_RESULT([yes])],
+        [AC_MSG_RESULT([no])])
+    
+    # Vérifier AVX2
+    if test "x$have_avx" = "xyes"; then
+        AC_MSG_CHECKING([for AVX2 support])
+        AC_COMPILE_IFELSE(
+            [AC_LANG_PROGRAM([[
+                #include <immintrin.h>
+            ]], [[
+                __m256i a = _mm256_setzero_si256();
+                __m256i b = _mm256_add_epi32(a, a);
+            ]])],
+            [have_avx2=yes
+             AC_DEFINE([HAVE_AVX2], [1], [Define if AVX2 is available])
+             AC_MSG_RESULT([yes])],
+            [AC_MSG_RESULT([no])])
+    fi
+    
+    if test "x$have_sse4_1" = "xyes" || test "x$have_avx" = "xyes"; then
+        AC_MSG_NOTICE([SIMD support enabled])
+    else
+        AC_MSG_NOTICE([SIMD support disabled - no compatible instructions found])
+    fi
+else
+    AC_MSG_NOTICE([SIMD support disabled by user])
+fi
+
+AM_CONDITIONAL([HAVE_SSE4_1], [test "x$have_sse4_1" = "xyes"])
+AM_CONDITIONAL([HAVE_AVX], [test "x$have_avx" = "xyes"])
+AM_CONDITIONAL([HAVE_AVX2], [test "x$have_avx2" = "xyes"])
+
 
 
 

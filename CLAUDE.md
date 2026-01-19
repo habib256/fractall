@@ -4,22 +4,32 @@ Visualiseur de fractales portable en C utilisant SDL.
 
 **Licence** : GPL-2.0
 **Auteur** : Arnaud VERHILLE (2001-2003)
-**Version** : 0.5
+**Version** : 1.0
 
 ## Compilation
 
 ```bash
 ./autogen.sh      # Si configure n'existe pas
-./configure       # --with-gmp pour activer la haute précision
+./configure       # Options disponibles ci-dessous
 make
 ./src/fractall
 ```
+
+### Options de configuration
+
+| Option | Description | Défaut |
+|--------|-------------|--------|
+| `--with-gmp` | Active la haute précision (zooms profonds) | activé |
+| `--without-gmp` | Désactive GMP | - |
+| `--disable-openmp` | Désactive le calcul parallèle OpenMP | activé |
+| `--disable-simd` | Désactive les optimisations SIMD | activé |
 
 ### Dépendances
 
 - SDL 1.2.0+
 - Bibliothèque mathématique (`-lm`)
 - GMP (optionnel) : précision arbitraire pour zooms profonds
+- OpenMP (optionnel) : calcul parallèle multi-cœurs
 
 ## Utilisation
 
@@ -59,6 +69,7 @@ src/
 ├── SDLGUI.[ch]      # Interface graphique
 ├── complexmath.[ch] # Arithmétique complexe
 ├── complexmath_gmp.[ch] # Arithmétique GMP (optionnel)
+├── complexmath_simd.c   # Arithmétique SIMD (SSE4.1/AVX)
 ├── precision_detector.[ch] # Détection précision GMP
 └── SDL_gfx*         # Primitives graphiques
 ```
@@ -160,12 +171,32 @@ typedef struct {
 
 ## Optimisation du rendu
 
-**Divergence Detection** en deux passes :
+### Divergence Detection
+
+Algorithme en deux passes :
 
 1. **DDp1** : Calcul grille 2×2, interpolation pixels intermédiaires
 2. **DDp2** : Affinage des manquants, évite calcul si 4 voisins identiques
 
 Permet un aperçu rapide suivi d'un rendu complet.
+
+### Parallélisation OpenMP
+
+Avec OpenMP activé, le calcul des fractales est parallélisé sur tous les cœurs CPU :
+- Boucles de rendu DDp1/DDp2 parallélisées avec `#pragma omp parallel for`
+- Ordonnancement `guided` pour équilibrage dynamique de charge
+- Variables thread-local pour éviter les race conditions
+- Support spécial pour Buddhabrot (incréments atomiques sur la matrice de densité)
+- Support spécial pour Lyapunov (parallélisation par lignes)
+
+### Optimisations SIMD
+
+Opérations vectorisées sur nombres complexes (`complexmath_simd.c`) :
+- **SSE4.1** : 2 complexes traités simultanément (128 bits)
+- **AVX** : 4 complexes traités simultanément (256 bits)
+- Fonctions : `complex_mul_sse4()`, `complex_add_sse4()`, `complex_mag2_sse4()`, `complex_mul_avx()`
+
+La détection des instructions SIMD est automatique à la compilation.
 
 ## Précision GMP
 
@@ -210,3 +241,5 @@ main()
 - `Lyapunov_Draw()` pour le type 17 (algorithme d'exposant de Lyapunov)
 - `Fractal_Draw()` détecte automatiquement les types 16 et 17 et appelle leurs fonctions spécialisées
 - `Fractal_GetTypeName()` retourne le nom selon le type (0-17)
+- OpenMP : `HAVE_OPENMP` défini dans `config.h` si disponible
+- SIMD : `HAVE_SSE4_1`, `HAVE_AVX`, `HAVE_AVX2` définis selon le support CPU

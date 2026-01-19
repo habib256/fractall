@@ -89,4 +89,15 @@ extern complex Arcsinhz(complex);
 extern complex Arccoshz(complex);
 //extern complex Arctanhz(complex);
 
+// SIMD-optimized batch operations
+#ifdef HAVE_SSE4_1
+void complex_mul_sse4(complex* result, const complex* a, const complex* b, int count);
+void complex_add_sse4(complex* result, const complex* a, const complex* b, int count);
+void complex_mag2_sse4(double* result, const complex* a, int count);
+#endif
+
+#ifdef HAVE_AVX
+void complex_mul_avx(complex* result, const complex* a, const complex* b, int count);
+#endif
+
 /*  end  */

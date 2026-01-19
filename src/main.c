@@ -642,16 +642,35 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 								mpf_set_prec(f->ymax_gmp, f->gmp_precision);
 							}
 							// Réallouer zmatrix_gmp si nécessaire
-							if (f->use_gmp && f->zmatrix_gmp == NULL) {
-								f->zmatrix_gmp = (complex_gmp *) malloc ((f->xpixel*f->ypixel)* sizeof (complex_gmp));
+							if (f->use_gmp) {
+								// Si zmatrix_gmp existe déjà, vérifier si la précision a changé
+								if (f->zmatrix_gmp != NULL && f->xpixel > 0 && f->ypixel > 0) {
+									// Vérifier si zmatrix_gmp[0] est initialisé avant d'accéder à sa précision
+									mp_bitcnt_t old_prec = 0;
+									// Essayer de lire la précision, si elle est 0, l'élément n'est pas initialisé
+									old_prec = mpf_get_prec(f->zmatrix_gmp[0].x);
+									if (old_prec == 0 || old_prec != f->gmp_precision) {
+										// Précision changée ou non initialisé : réallouer
+										for (int k = 0; k < f->xpixel * f->ypixel; k++) {
+											complex_gmp_clear(&f->zmatrix_gmp[k]);
+										}
+										free(f->zmatrix_gmp);
+										f->zmatrix_gmp = NULL;
+									}
+								}
+								// Allouer si nécessaire
 								if (f->zmatrix_gmp == NULL) {
-									fprintf(stderr, "Erreur allocation mémoire GMP fractale\n");
-								} else {
-									for (int k = 0; k < f->xpixel * f->ypixel; k++) {
-										complex_gmp_init(&f->zmatrix_gmp[k], f->gmp_precision);
+									f->zmatrix_gmp = (complex_gmp *) malloc ((f->xpixel*f->ypixel)* sizeof (complex_gmp));
+									if (f->zmatrix_gmp == NULL) {
+										fprintf(stderr, "Erreur allocation mémoire GMP fractale\n");
+									} else {
+										for (int k = 0; k < f->xpixel * f->ypixel; k++) {
+											complex_gmp_init(&f->zmatrix_gmp[k], f->gmp_precision);
+										}
 									}
 								}
 							} else if (!f->use_gmp && f->zmatrix_gmp != NULL) {
+								// Libérer si on passe en mode non-GMP
 								for (int k = 0; k < f->xpixel * f->ypixel; k++) {
 									complex_gmp_clear(&f->zmatrix_gmp[k]);
 								}
@@ -710,16 +729,35 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 							mpf_set_d(f->ymax_gmp, f->ymax);
 						}
 						// Réallouer zmatrix_gmp si nécessaire
-						if (f->use_gmp && f->zmatrix_gmp == NULL) {
-							f->zmatrix_gmp = (complex_gmp *) malloc ((f->xpixel*f->ypixel)* sizeof (complex_gmp));
+						if (f->use_gmp) {
+							// Si zmatrix_gmp existe déjà, vérifier si la précision a changé
+							if (f->zmatrix_gmp != NULL && f->xpixel > 0 && f->ypixel > 0) {
+								// Vérifier si zmatrix_gmp[0] est initialisé avant d'accéder à sa précision
+								mp_bitcnt_t old_prec = 0;
+								// Essayer de lire la précision, si elle est 0, l'élément n'est pas initialisé
+								old_prec = mpf_get_prec(f->zmatrix_gmp[0].x);
+								if (old_prec == 0 || old_prec != f->gmp_precision) {
+									// Précision changée : réallouer
+									for (int k = 0; k < f->xpixel * f->ypixel; k++) {
+										complex_gmp_clear(&f->zmatrix_gmp[k]);
+									}
+									free(f->zmatrix_gmp);
+									f->zmatrix_gmp = NULL;
+								}
+							}
+							// Allouer si nécessaire
 							if (f->zmatrix_gmp == NULL) {
-								fprintf(stderr, "Erreur allocation mémoire GMP fractale\n");
-							} else {
-								for (int k = 0; k < f->xpixel * f->ypixel; k++) {
-									complex_gmp_init(&f->zmatrix_gmp[k], f->gmp_precision);
+								f->zmatrix_gmp = (complex_gmp *) malloc ((f->xpixel*f->ypixel)* sizeof (complex_gmp));
+								if (f->zmatrix_gmp == NULL) {
+									fprintf(stderr, "Erreur allocation mémoire GMP fractale\n");
+								} else {
+									for (int k = 0; k < f->xpixel * f->ypixel; k++) {
+										complex_gmp_init(&f->zmatrix_gmp[k], f->gmp_precision);
+									}
 								}
 							}
 						} else if (!f->use_gmp && f->zmatrix_gmp != NULL) {
+							// Libérer si on passe en mode non-GMP
 							for (int k = 0; k < f->xpixel * f->ypixel; k++) {
 								complex_gmp_clear(&f->zmatrix_gmp[k]);
 							}
@@ -849,16 +887,35 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 								mpf_set_prec(f->ymax_gmp, f->gmp_precision);
 							}
 							// Réallouer zmatrix_gmp si nécessaire
-							if (f->use_gmp && f->zmatrix_gmp == NULL) {
-								f->zmatrix_gmp = (complex_gmp *) malloc ((f->xpixel*f->ypixel)* sizeof (complex_gmp));
+							if (f->use_gmp) {
+								// Si zmatrix_gmp existe déjà, vérifier si la précision a changé
+								if (f->zmatrix_gmp != NULL && f->xpixel > 0 && f->ypixel > 0) {
+									// Vérifier si zmatrix_gmp[0] est initialisé avant d'accéder à sa précision
+									mp_bitcnt_t old_prec = 0;
+									// Essayer de lire la précision, si elle est 0, l'élément n'est pas initialisé
+									old_prec = mpf_get_prec(f->zmatrix_gmp[0].x);
+									if (old_prec == 0 || old_prec != f->gmp_precision) {
+										// Précision changée ou non initialisé : réallouer
+										for (int k = 0; k < f->xpixel * f->ypixel; k++) {
+											complex_gmp_clear(&f->zmatrix_gmp[k]);
+										}
+										free(f->zmatrix_gmp);
+										f->zmatrix_gmp = NULL;
+									}
+								}
+								// Allouer si nécessaire
 								if (f->zmatrix_gmp == NULL) {
-									fprintf(stderr, "Erreur allocation mémoire GMP fractale\n");
-								} else {
-									for (int k = 0; k < f->xpixel * f->ypixel; k++) {
-										complex_gmp_init(&f->zmatrix_gmp[k], f->gmp_precision);
+									f->zmatrix_gmp = (complex_gmp *) malloc ((f->xpixel*f->ypixel)* sizeof (complex_gmp));
+									if (f->zmatrix_gmp == NULL) {
+										fprintf(stderr, "Erreur allocation mémoire GMP fractale\n");
+									} else {
+										for (int k = 0; k < f->xpixel * f->ypixel; k++) {
+											complex_gmp_init(&f->zmatrix_gmp[k], f->gmp_precision);
+										}
 									}
 								}
 							} else if (!f->use_gmp && f->zmatrix_gmp != NULL) {
+								// Libérer si on passe en mode non-GMP
 								for (int k = 0; k < f->xpixel * f->ypixel; k++) {
 									complex_gmp_clear(&f->zmatrix_gmp[k]);
 								}
@@ -917,16 +974,35 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 							mpf_set_d(f->ymax_gmp, f->ymax);
 						}
 						// Réallouer zmatrix_gmp si nécessaire
-						if (f->use_gmp && f->zmatrix_gmp == NULL) {
-							f->zmatrix_gmp = (complex_gmp *) malloc ((f->xpixel*f->ypixel)* sizeof (complex_gmp));
+						if (f->use_gmp) {
+							// Si zmatrix_gmp existe déjà, vérifier si la précision a changé
+							if (f->zmatrix_gmp != NULL && f->xpixel > 0 && f->ypixel > 0) {
+								// Vérifier si zmatrix_gmp[0] est initialisé avant d'accéder à sa précision
+								mp_bitcnt_t old_prec = 0;
+								// Essayer de lire la précision, si elle est 0, l'élément n'est pas initialisé
+								old_prec = mpf_get_prec(f->zmatrix_gmp[0].x);
+								if (old_prec == 0 || old_prec != f->gmp_precision) {
+									// Précision changée : réallouer
+									for (int k = 0; k < f->xpixel * f->ypixel; k++) {
+										complex_gmp_clear(&f->zmatrix_gmp[k]);
+									}
+									free(f->zmatrix_gmp);
+									f->zmatrix_gmp = NULL;
+								}
+							}
+							// Allouer si nécessaire
 							if (f->zmatrix_gmp == NULL) {
-								fprintf(stderr, "Erreur allocation mémoire GMP fractale\n");
-							} else {
-								for (int k = 0; k < f->xpixel * f->ypixel; k++) {
-									complex_gmp_init(&f->zmatrix_gmp[k], f->gmp_precision);
+								f->zmatrix_gmp = (complex_gmp *) malloc ((f->xpixel*f->ypixel)* sizeof (complex_gmp));
+								if (f->zmatrix_gmp == NULL) {
+									fprintf(stderr, "Erreur allocation mémoire GMP fractale\n");
+								} else {
+									for (int k = 0; k < f->xpixel * f->ypixel; k++) {
+										complex_gmp_init(&f->zmatrix_gmp[k], f->gmp_precision);
+									}
 								}
 							}
 						} else if (!f->use_gmp && f->zmatrix_gmp != NULL) {
+							// Libérer si on passe en mode non-GMP
 							for (int k = 0; k < f->xpixel * f->ypixel; k++) {
 								complex_gmp_clear(&f->zmatrix_gmp[k]);
 							}

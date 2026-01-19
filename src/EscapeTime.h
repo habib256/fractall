@@ -24,6 +24,15 @@ typedef struct {
   int r, g, b, a;
 } color;
 
+// Structure de cache pour réutilisation lors de zooms
+typedef struct {
+  double xmin_cached, xmax_cached, ymin_cached, ymax_cached;
+  int* fmatrix_cached;
+  color* cmatrix_cached;
+  int cache_valid;
+  int cache_xpixel, cache_ypixel;  // Dimensions du cache
+} fractal_cache;
+
 // Create a new fractal type
 typedef struct {
   int xpixel, ypixel;
@@ -36,9 +45,11 @@ typedef struct {
   int colorMode;   // 0=SmoothFire, 1=SmoothOcean
   int cmatrix_valid;   // 1 si cmatrix est valide pour le colorMode actuel
   int last_colorMode;  // colorMode lors du dernier calcul de cmatrix
+  double zoom_level;   // Niveau de zoom actuel pour détection de changement
   int *fmatrix;    // la matrice d'iteration
   complex *zmatrix;  // la matrice de la valeur de z a la derniere iteration
   color *cmatrix; // Une matrice de couleurs, soit la fractale finale.
+  fractal_cache cache;  // Cache pour réutilisation lors de zooms
 #ifdef HAVE_GMP
   int use_gmp;     // Flag pour utiliser GMP (1) ou double (0)
   mp_bitcnt_t gmp_precision; // Précision GMP en bits

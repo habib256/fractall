@@ -32,6 +32,19 @@ fractall_SOURCES = \
 	VonKoch.c \
 	VonKoch.h
 
+if HAVE_SSE4_1
+fractall_SOURCES += complexmath_simd.c
+AM_CFLAGS += -msse4.1
+endif
+
+if HAVE_AVX
+AM_CFLAGS += -mavx
+endif
+
+if HAVE_AVX2
+AM_CFLAGS += -mavx2
+endif
+
 if HAVE_GMP
 fractall_SOURCES += \
 	complexmath_gmp.c \

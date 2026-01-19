@@ -97,6 +97,23 @@ complex_gmp complex_to_gmp(complex z, mp_bitcnt_t prec) {
     return rz;
 }
 
+// Met à jour un complex_gmp existant (évite les allocations/désallocations inutiles)
+void complex_to_gmp_inplace(complex_gmp* dest, complex z, mp_bitcnt_t prec) {
+    // Vérifier si dest est déjà initialisé
+    // Si la précision est 0, cela signifie que ce n'est pas initialisé
+    mp_bitcnt_t current_prec = mpf_get_prec(dest->x);
+    if (current_prec == 0) {
+        // Non initialisé : initialiser
+        complex_gmp_init(dest, prec);
+    } else if (current_prec != prec) {
+        // Précision différente : mettre à jour la précision
+        complex_gmp_set_prec(dest, prec);
+    }
+    mpf_set_d(dest->x, z.x);
+    mpf_set_d(dest->y, z.y);
+    dest->is_nan = 0;
+}
+
 complex gmp_to_complex(complex_gmp zg) {
     complex rz;
     rz.x = mpf_get_d(zg.x);

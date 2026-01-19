@@ -37,6 +37,7 @@ complex_gmp complex_gmp_copy(complex_gmp z, mp_bitcnt_t prec);
 
 // Conversion
 complex_gmp complex_to_gmp(complex z, mp_bitcnt_t prec);
+void complex_to_gmp_inplace(complex_gmp* dest, complex z, mp_bitcnt_t prec);  // Met à jour un complex_gmp existant
 complex gmp_to_complex(complex_gmp zg);
 
 // Accès aux parties

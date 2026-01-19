@@ -1,5 +1,11 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
+/* Define if AVX is available */
+#undef HAVE_AVX
+
+/* Define if AVX2 is available */
+#undef HAVE_AVX2
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
@@ -11,6 +17,9 @@
 
 /* Define if OpenMP is available */
 #undef HAVE_OPENMP
+
+/* Define if SSE4.1 is available */
+#undef HAVE_SSE4_1
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
