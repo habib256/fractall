@@ -282,7 +282,8 @@ static void Fractal_CalculateMatrix_DDp1_GMP (fractal* f, SDL_Surface* canvas, v
 	double step_y_double = (ymax_double - ymin_double) / f->ypixel;
 
 #ifdef HAVE_OPENMP
-	int chunk_height = 16;  // Traiter 16 lignes par chunk (8 itérations car j += 2)
+	int chunk_height = num_threads * 8;  // Au moins 4 itérations par thread (car j += 2)
+	if (chunk_height < 32) chunk_height = 32;  // Minimum 32 lignes
 
 	#pragma omp parallel
 	{
@@ -744,7 +745,8 @@ static void Fractal_CalculateMatrix_DDp2_GMP (fractal* f, SDL_Surface* canvas, v
 
 	// Pass 1: Calcul initial des pixels impairs (parallélisable)
 #ifdef HAVE_OPENMP
-	int chunk_height_p1 = 16;  // Traiter 16 lignes par chunk (8 itérations car j += 2)
+	int chunk_height_p1 = num_threads * 8;  // Au moins 4 itérations par thread (car j += 2)
+	if (chunk_height_p1 < 32) chunk_height_p1 = 32;  // Minimum 32 lignes
 	int cancelled_p1 = 0;
 
 	#pragma omp parallel
@@ -957,7 +959,8 @@ static void Fractal_CalculateMatrix_DDp2_GMP (fractal* f, SDL_Surface* canvas, v
 
 	// Pass 2: Divergence Detection (DD) - parallélisable (chaque pixel écrit à son propre indice)
 #ifdef HAVE_OPENMP
-	int chunk_height_p2 = 16;  // Traiter 16 lignes par chunk
+	int chunk_height_p2 = num_threads * 4;  // Au moins 4 itérations par thread
+	if (chunk_height_p2 < 32) chunk_height_p2 = 32;  // Minimum 32 lignes
 	int cancelled_p2 = 0;
 
 	#pragma omp parallel
