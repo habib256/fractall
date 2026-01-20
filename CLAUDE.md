@@ -256,6 +256,52 @@ main()
 - Historique zoom (undo/redo)
 - Palettes personnalisables
 - Amélioration du GUI (voir section ci-dessous)
+- Nouveaux types de fractales (voir PLAN_RECHERCHE_FRACTALES.md)
+
+## Améliorations possibles : Nouveaux types de fractales
+
+Un plan de recherche détaillé est disponible dans **PLAN_RECHERCHE_FRACTALES.md**.
+
+### Catégories identifiées
+
+#### Priorité HAUTE (faciles à implémenter)
+1. **Perpendicular Burning Ship** - Variante du Burning Ship avec pliage perpendiculaire
+   - Formule : `z(n+1) = (Re(z) - i×|Im(z)|)² + c`
+   - Complexité : ⭐ Faible (similaire au type 13)
+
+2. **Celtic Fractal** - Formes celtiques entrelacées
+   - Formule : `z(n+1) = |Re(z²)| + i×|Im(z²)| + c`
+   - Complexité : ⭐ Faible
+
+3. **Alpha Mandelbrot** - Structures superposées
+   - Formule : `z(n+1) = z² + (z² + c)² + c`
+   - Complexité : ⭐ Faible
+
+#### Priorité MOYENNE (intéressantes mais plus complexes)
+4. **Pickover Stalks / Biomorphs** - Formes biologiques/organiques
+   - Formule : `z(n+1) = sin(z) + exp(z) + c` avec orbit trap
+   - Complexité : ⭐⭐ Moyenne (système d'orbit trap)
+
+5. **Nova Fractal** - Variante Newton avec spirales élégantes
+   - Formule : `z(n+1) = z - a×p(z)/p'(z) + c`
+   - Complexité : ⭐⭐ Moyenne (dérivée polynomiale)
+
+6. **Multibrot (puissances non-entières)** - Morphing entre formes
+   - Formule : `z(n+1) = z(n)^d + c` où d est réel (2.5, 3.7, etc.)
+   - Complexité : ⭐⭐ Moyenne (gestion branch cuts)
+
+#### Priorité BASSE (nécessitent modifications architecturales)
+7. **Fractales 3D/Quaternions** - Mandelbox, Quaternion Julia
+   - Complexité : ⭐⭐⭐ Élevée (rendu 3D requis)
+
+### Ressources de recherche
+
+- **FractalForums.com** : Base de données de formules
+- **UltraFractal.com** : Bibliothèque de formules documentées
+- **Paul Bourke** (paulbourke.net) : Articles et algorithmes
+- **GitHub** : Implémentations open-source (kf2, Fractalshades)
+
+Voir **PLAN_RECHERCHE_FRACTALES.md** pour le plan détaillé de recherche et d'implémentation.
 
 ## Notes
 
