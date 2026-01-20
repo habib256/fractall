@@ -193,7 +193,13 @@ main (int argc, char *argv[])
 	}
 	
 	// On initialise la fractale
-	f = Fractal_Init (win.w, win.y2-win.y1,typeFractale);
+	// Protection contre valeur négative pour les dimensions
+	int fractalHeight = win.y2 - win.y1;
+	if (fractalHeight <= 0) {
+		fprintf(stderr, "Erreur: hauteur fractale invalide (%d). Vérifiez les paramètres -g et -y.\n", fractalHeight);
+		fractalHeight = 100;  // Valeur par défaut minimale
+	}
+	f = Fractal_Init (win.w, fractalHeight, typeFractale);
 	
 	// Tracer les diverses fractales
 	// *****************************

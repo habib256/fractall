@@ -357,17 +357,21 @@ void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMod
 	SDLGUI_StateBar_Draw(screen, g);
 
 	// Formater le texte principal (gauche)
-	if (type >= 1 && type <= 17 && typeName[0] != '\0') {
+	if (type >= 1 && type <= 23 && typeName[0] != '\0') {
+		// Récupérer les informations supplémentaires depuis la structure fractal
+		int iterationMax = (f != NULL) ? f->iterationMax : 0;
+		int colorRepeat = (f != NULL) ? f->colorRepeat : 20;
+		
 		// Afficher le zoom en notation adaptée selon la valeur
 		if (zoomFactor >= 1e6) {
-			snprintf(statusText, sizeof(statusText), "%s | %s | x%.2e | (%.6f, %.6f) | %dms",
-				typeName, paletteName, zoomFactor, centerX, centerY, renderTime);
+			snprintf(statusText, sizeof(statusText), "%s | Rep:%d | %s | Iter:%d | x%.2e | (%.6f, %.6f) | %dms",
+				typeName, colorRepeat, paletteName, iterationMax, zoomFactor, centerX, centerY, renderTime);
 		} else if (zoomFactor >= 1000) {
-			snprintf(statusText, sizeof(statusText), "%s | %s | x%.0f | (%.6f, %.6f) | %dms",
-				typeName, paletteName, zoomFactor, centerX, centerY, renderTime);
+			snprintf(statusText, sizeof(statusText), "%s | Rep:%d | %s | Iter:%d | x%.0f | (%.6f, %.6f) | %dms",
+				typeName, colorRepeat, paletteName, iterationMax, zoomFactor, centerX, centerY, renderTime);
 		} else {
-			snprintf(statusText, sizeof(statusText), "%s | %s | x%.1f | (%.3f, %.3f) | %dms",
-				typeName, paletteName, zoomFactor, centerX, centerY, renderTime);
+			snprintf(statusText, sizeof(statusText), "%s | Rep:%d | %s | Iter:%d | x%.1f | (%.3f, %.3f) | %dms",
+				typeName, colorRepeat, paletteName, iterationMax, zoomFactor, centerX, centerY, renderTime);
 		}
 	} else {
 		snprintf(statusText, sizeof(statusText), "Type %d | %s", type, paletteName);

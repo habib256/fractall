@@ -652,6 +652,11 @@ void Fractal_CalculateMatrix_DDp1 (fractal* f, SDL_Surface* canvas, void* guiPtr
 	int ypixel = f->ypixel;
 	double xmin = f->xmin;
 	double ymin = f->ymin;
+	// Protection contre division par zéro
+	if (xpixel <= 0 || ypixel <= 0) {
+		fprintf(stderr, "Erreur: dimensions invalides pour DDp1 (xpixel=%d, ypixel=%d)\n", xpixel, ypixel);
+		return;
+	}
 	double xstep = (f->xmax - f->xmin) / xpixel;
 	double ystep = (f->ymax - f->ymin) / ypixel;
 
@@ -1290,6 +1295,11 @@ void Fractal_CalculateMatrix_DDp2 (fractal* f, SDL_Surface* canvas, void* guiPtr
 	int ypixel = f->ypixel;
 	double xmin = f->xmin;
 	double ymin = f->ymin;
+	// Protection contre division par zéro
+	if (xpixel <= 0 || ypixel <= 0) {
+		fprintf(stderr, "Erreur: dimensions invalides pour DDp1 (xpixel=%d, ypixel=%d)\n", xpixel, ypixel);
+		return;
+	}
 	double xstep = (f->xmax - f->xmin) / xpixel;
 	double ystep = (f->ymax - f->ymin) / ypixel;
 	int progressMid = progressStart + (progressEnd - progressStart) / 2;
@@ -1410,8 +1420,16 @@ void Fractal_CalculateMatrix_DDp2 (fractal* f, SDL_Surface* canvas, void* guiPtr
 				f->fmatrix[xpixel * j + i] = up;
 
 				// Et on calcule une moyenne pour la valeur de z
-				double rz = (Rez(zup) + Rez(zdown) + Rez(zleft) + Rez(zright)) / compteur;
-				double iz = (Imz(zup) + Imz(zdown) + Imz(zleft) + Imz(zright)) / compteur;
+				// Protection contre division par zéro (compteur devrait toujours être > 0)
+				double rz, iz;
+				if (compteur > 0) {
+					rz = (Rez(zup) + Rez(zdown) + Rez(zleft) + Rez(zright)) / compteur;
+					iz = (Imz(zup) + Imz(zdown) + Imz(zleft) + Imz(zright)) / compteur;
+				} else {
+					// Cas de sécurité : utiliser la moyenne des valeurs disponibles
+					rz = (Rez(zup) + Rez(zdown) + Rez(zleft) + Rez(zright)) / 4.0;
+					iz = (Imz(zup) + Imz(zdown) + Imz(zleft) + Imz(zright)) / 4.0;
+				}
 				f->zmatrix[xpixel * j + i] = MakeComplex(rz, iz);
 			} else {
 				// Sinon, je calcule
@@ -2706,6 +2724,12 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 	double xrange = f->xmax - f->xmin;
 	double yrange = f->ymax - f->ymin;
 
+	// Protection contre division par zéro
+	if (xrange <= 0.0 || yrange <= 0.0) {
+		fprintf(stderr, "Erreur: coordonnées dégénérées pour Buddhabrot (xrange=%f, yrange=%f)\n", xrange, yrange);
+		return 0;
+	}
+
 	time = SDL_GetTicks();
 
 	printf("Calculating Buddhabrot (density algorithm)...\n");
@@ -3063,7 +3087,12 @@ static Uint32 Lyapunov_Draw_Sequence (SDL_Surface *canvas, fractal* f, int decal
 				}
 			}
 
-			lyap /= iterMax;
+			// Protection contre division par zéro
+			if (iterMax > 0) {
+				lyap /= iterMax;
+			} else {
+				lyap = 0.0;  // Valeur par défaut si iterMax est invalide
+			}
 
 			// Convertir l'exposant en valeur normalisée pour les palettes
 			double normalizedValue = Lyapunov_GetNormalizedValue(lyap);
