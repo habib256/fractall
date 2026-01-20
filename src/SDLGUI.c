@@ -10,6 +10,7 @@
 #include "SDLGUI.h"
 #include "VonKoch.h"
 #include "EscapeTime.h"
+#include "colorization.h"
 #include "SDL_gfxPrimitives.h"
 
 
@@ -178,10 +179,8 @@ void SDLGUI_Draw3DBox (SDL_Surface *surface, int x, int y, int w, int h, Uint32 
 }
 
 void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMode, double centerX, double centerY, double zoomFactor, Uint32 renderTime, fractal* f) {
-	const char* typeNames[] = {"", "Von Koch", "Dragon", "Mandelbrot", "Julia", "Julia Sin",
-		"Newton", "Phoenix", "", "Barnsley J", "Barnsley M",
-		"Magnet J", "Magnet M", "Burning Ship", "Tricorn", "Mandelbulb", "Buddhabrot"};
-	const char* paletteNames[] = {"SmoothFire", "SmoothOcean", "SmoothForest", "SmoothViolet", "SmoothRainbow"};
+	const char* typeName = Fractal_GetTypeName(type);
+	const char* paletteName = Colorization_GetPaletteName(colorMode);
 	char statusText[256];
 	char precisionText[64];
 	int precisionX;
@@ -190,20 +189,20 @@ void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMod
 	SDLGUI_StateBar_Draw(screen, g);
 
 	// Formater le texte principal (gauche)
-	if (type >= 1 && type <= 16) {
+	if (type >= 1 && type <= 17 && typeName[0] != '\0') {
 		// Afficher le zoom en notation adaptée selon la valeur
 		if (zoomFactor >= 1e6) {
 			snprintf(statusText, sizeof(statusText), "%s | %s | x%.2e | (%.6f, %.6f) | %dms",
-				typeNames[type], paletteNames[colorMode], zoomFactor, centerX, centerY, renderTime);
+				typeName, paletteName, zoomFactor, centerX, centerY, renderTime);
 		} else if (zoomFactor >= 1000) {
 			snprintf(statusText, sizeof(statusText), "%s | %s | x%.0f | (%.6f, %.6f) | %dms",
-				typeNames[type], paletteNames[colorMode], zoomFactor, centerX, centerY, renderTime);
+				typeName, paletteName, zoomFactor, centerX, centerY, renderTime);
 		} else {
 			snprintf(statusText, sizeof(statusText), "%s | %s | x%.1f | (%.3f, %.3f) | %dms",
-				typeNames[type], paletteNames[colorMode], zoomFactor, centerX, centerY, renderTime);
+				typeName, paletteName, zoomFactor, centerX, centerY, renderTime);
 		}
 	} else {
-		snprintf(statusText, sizeof(statusText), "Type %d | %s", type, paletteNames[colorMode]);
+		snprintf(statusText, sizeof(statusText), "Type %d | %s", type, paletteName);
 	}
 
 	// Afficher le texte principal à gauche

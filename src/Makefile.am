@@ -16,6 +16,9 @@ fractall_SOURCES = \
 	main.c \
 	complexmath.c \
 	complexmath.h \
+	color_types.h \
+	colorization.c \
+	colorization.h \
 	EscapeTime.c \
 	EscapeTime.h \
 	exception.c \

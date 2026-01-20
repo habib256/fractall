@@ -8,7 +8,7 @@ A portable fractal explorer written in C using SDL.
 ## Features
 
 - **17 fractal types**: Von Koch, Dragon, Mandelbrot, Julia, Newton, Phoenix, Burning Ship, Tricorn, Mandelbulb, Buddhabrot, Lyapunov Zircon City, and more
-- **5 smooth color palettes**: SmoothFire, SmoothOcean, SmoothForest, SmoothViolet, SmoothRainbow
+- **6 smooth color palettes**: SmoothFire, SmoothOcean, SmoothForest, SmoothViolet, SmoothRainbow, SmoothSunset
 - **Smooth coloring**: Eliminates visible color bands using continuous iteration interpolation
 - **Interactive zoom**: Click to zoom in/out, explore fractal details
 - **Status bar**: Displays fractal type, palette, zoom level, coordinates, and render time
@@ -87,6 +87,7 @@ fractall [OPTIONS]
 | SmoothForest | Black → Green → Yellow → White (smooth gradients, configurable repetition) |
 | SmoothViolet | Black → Violet → Pink → White (smooth gradients, configurable repetition) |
 | SmoothRainbow | Full rainbow spectrum (Red → Orange → Yellow → Green → Cyan → Blue → Violet) |
+| SmoothSunset | Black → Orange → Red → Violet → Dark Blue (smooth gradients, configurable repetition) |
 
 All palettes use continuous iteration interpolation based on |z| to eliminate visible color banding. The palettes alternate forward/reverse to avoid abrupt transitions. Gradient repetition can be adjusted with the **R** key (default: 20 for escape-time fractals, 2 for Lyapunov).
 

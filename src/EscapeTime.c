@@ -13,6 +13,7 @@ Copyleft 2001-2003 VERHILLE Arnaud
 #include "SDL_gfxPrimitives.h"
 #include "EscapeTime.h"
 #include "SDLGUI.h"   // Pour la barre de progression
+#include "colorization.h"  // Unified colorization system
 #ifdef HAVE_GMP
 #include "precision_detector.h"
 #endif
@@ -45,9 +46,10 @@ fractal Fractal_Init (int screenW, int screenH, int type) {
 	f.xpixel = screenW;
 	f.ypixel = screenH;
 	f.type = type;
-	f.colorMode = 0;  // SmoothFire par défaut
+	f.colorMode = 6;  // SmoothPlasma par défaut
 	f.cmatrix_valid = 0;
 	f.last_colorMode = -1;
+	f.last_colorRepeat = -1;
 	// Répétition par défaut selon le type : 20 pour escape-time, 2 pour Lyapunov
 	if (type == 17) {
 		f.colorRepeat = 2;  // 2 répétitions pour Lyapunov
@@ -331,6 +333,7 @@ static void Fractal_CalculateMatrix_DDp1_GMP (fractal* f, SDL_Surface* canvas, v
 		f_local.cmatrix_valid = f->cmatrix_valid;
 		f_local.last_colorMode = f->last_colorMode;
 		f_local.colorRepeat = f->colorRepeat;
+		f_local.last_colorRepeat = f->last_colorRepeat;
 		f_local.zoom_level = f->zoom_level;
 		f_local.fmatrix = f->fmatrix;  // Partagé en écriture (mais chaque thread écrit à des indices différents)
 		f_local.zmatrix = f->zmatrix;  // Partagé en écriture
@@ -794,6 +797,7 @@ static void Fractal_CalculateMatrix_DDp2_GMP (fractal* f, SDL_Surface* canvas, v
 		f_local.cmatrix_valid = f->cmatrix_valid;
 		f_local.last_colorMode = f->last_colorMode;
 		f_local.colorRepeat = f->colorRepeat;
+		f_local.last_colorRepeat = f->last_colorRepeat;
 		f_local.zoom_level = f->zoom_level;
 		f_local.fmatrix = f->fmatrix;
 		f_local.zmatrix = f->zmatrix;
@@ -1011,6 +1015,7 @@ static void Fractal_CalculateMatrix_DDp2_GMP (fractal* f, SDL_Surface* canvas, v
 		f_local.cmatrix_valid = f->cmatrix_valid;
 		f_local.last_colorMode = f->last_colorMode;
 		f_local.colorRepeat = f->colorRepeat;
+		f_local.last_colorRepeat = f->last_colorRepeat;
 		f_local.zoom_level = f->zoom_level;
 		f_local.fmatrix = f->fmatrix;
 		f_local.zmatrix = f->zmatrix;
@@ -1504,288 +1509,15 @@ color HSVtoRGB(double h, double s, double v) {
 	return c;
 }
 
-/* Palette Smooth Fire : version fluide de Fire avec répétition 4x (alternant endroit/envers) */
-void FractalColorSmoothFire(fractal* f) {
-	int j;
-	int xpixel = f->xpixel;
-	int ypixel = f->ypixel;
-
-#ifdef HAVE_OPENMP
-	#pragma omp parallel
-	{
-		#pragma omp for schedule(static) nowait
-		for (j = 0; j < ypixel; j++) {
-#else
-	for (j = 0; j < ypixel; j++) {
-#endif
-		int i;
-		for (i = 0; i < xpixel; i++) {
-			double t = Fractal_SmoothIteration(f, i, j);
-			// Répéter la palette selon colorRepeat de 0 au bailout
-			double repeatCount = (double)f->colorRepeat;
-			double cycle = floor(t * repeatCount);
-			double t_repeat = fmod(t * repeatCount, 1.0);
-			color c;
-			// Alterner entre l'endroit et l'envers pour éviter les transitions brutales
-			if ((int)cycle % 2 == 1) {
-				t_repeat = 1.0 - t_repeat;
-			}
-			if (t_repeat < 0.33) {
-				c.r = (int)(t_repeat * 3 * 255);
-				c.g = 0;
-				c.b = 0;
-			} else if (t_repeat < 0.66) {
-				c.r = 255;
-				c.g = (int)((t_repeat - 0.33) * 3 * 255);
-				c.b = 0;
-			} else {
-				c.r = 255;
-				c.g = 255;
-				c.b = (int)((t_repeat - 0.66) * 3 * 255);
-			}
-			f->cmatrix[xpixel * j + i] = c;
-		}
-	}
-#ifdef HAVE_OPENMP
-	} // Fin de la région parallèle
-#endif
-}
-
-/* Palette Smooth Ocean : version fluide de Ocean avec répétition 4x (alternant endroit/envers) */
-void FractalColorSmoothOcean(fractal* f) {
-	int j;
-	int xpixel = f->xpixel;
-	int ypixel = f->ypixel;
-
-#ifdef HAVE_OPENMP
-	#pragma omp parallel
-	{
-		#pragma omp for schedule(static) nowait
-		for (j = 0; j < ypixel; j++) {
-#else
-	for (j = 0; j < ypixel; j++) {
-#endif
-		int i;
-		for (i = 0; i < xpixel; i++) {
-			double t = Fractal_SmoothIteration(f, i, j);
-			// Répéter la palette selon colorRepeat de 0 au bailout
-			double repeatCount = (double)f->colorRepeat;
-			double cycle = floor(t * repeatCount);
-			double t_repeat = fmod(t * repeatCount, 1.0);
-			color c;
-			// Alterner entre l'endroit et l'envers pour éviter les transitions brutales
-			if ((int)cycle % 2 == 1) {
-				t_repeat = 1.0 - t_repeat;
-			}
-			if (t_repeat < 0.33) {
-				c.r = 0;
-				c.g = 0;
-				c.b = (int)(t_repeat * 3 * 255);
-			} else if (t_repeat < 0.66) {
-				c.r = 0;
-				c.g = (int)((t_repeat - 0.33) * 3 * 255);
-				c.b = 255;
-			} else {
-				c.r = (int)((t_repeat - 0.66) * 3 * 255);
-				c.g = 255;
-				c.b = 255;
-			}
-			f->cmatrix[xpixel * j + i] = c;
-		}
-	}
-#ifdef HAVE_OPENMP
-	} // Fin de la région parallèle
-#endif
-}
-
-/* Palette Smooth Forest : Noir → Vert → Jaune → Blanc */
-void FractalColorSmoothForest(fractal* f) {
-	int j;
-	int xpixel = f->xpixel;
-	int ypixel = f->ypixel;
-
-#ifdef HAVE_OPENMP
-	#pragma omp parallel
-	{
-		#pragma omp for schedule(static) nowait
-		for (j = 0; j < ypixel; j++) {
-#else
-	for (j = 0; j < ypixel; j++) {
-#endif
-		int i;
-		for (i = 0; i < xpixel; i++) {
-			double t = Fractal_SmoothIteration(f, i, j);
-			// Répéter la palette selon colorRepeat de 0 au bailout
-			double repeatCount = (double)f->colorRepeat;
-			double cycle = floor(t * repeatCount);
-			double t_repeat = fmod(t * repeatCount, 1.0);
-			color c;
-			if ((int)cycle % 2 == 1) {
-				t_repeat = 1.0 - t_repeat;
-			}
-			if (t_repeat < 0.33) {
-				// Noir → Vert foncé
-				c.r = 0;
-				c.g = (int)(t_repeat * 3 * 180);
-				c.b = 0;
-			} else if (t_repeat < 0.66) {
-				// Vert foncé → Jaune/Vert clair
-				c.r = (int)((t_repeat - 0.33) * 3 * 200);
-				c.g = 180 + (int)((t_repeat - 0.33) * 3 * 75);
-				c.b = 0;
-			} else {
-				// Jaune → Blanc
-				c.r = 200 + (int)((t_repeat - 0.66) * 3 * 55);
-				c.g = 255;
-				c.b = (int)((t_repeat - 0.66) * 3 * 255);
-			}
-			f->cmatrix[xpixel * j + i] = c;
-		}
-	}
-#ifdef HAVE_OPENMP
-	} // Fin de la région parallèle
-#endif
-}
-
-/* Palette Smooth Violet : Noir → Violet → Rose → Blanc */
-void FractalColorSmoothViolet(fractal* f) {
-	int j;
-	int xpixel = f->xpixel;
-	int ypixel = f->ypixel;
-
-#ifdef HAVE_OPENMP
-	#pragma omp parallel
-	{
-		#pragma omp for schedule(static) nowait
-		for (j = 0; j < ypixel; j++) {
-#else
-	for (j = 0; j < ypixel; j++) {
-#endif
-		int i;
-		for (i = 0; i < xpixel; i++) {
-			double t = Fractal_SmoothIteration(f, i, j);
-			// Répéter la palette selon colorRepeat de 0 au bailout
-			double repeatCount = (double)f->colorRepeat;
-			double cycle = floor(t * repeatCount);
-			double t_repeat = fmod(t * repeatCount, 1.0);
-			color c;
-			if ((int)cycle % 2 == 1) {
-				t_repeat = 1.0 - t_repeat;
-			}
-			if (t_repeat < 0.33) {
-				// Noir → Violet foncé
-				c.r = (int)(t_repeat * 3 * 128);
-				c.g = 0;
-				c.b = (int)(t_repeat * 3 * 200);
-			} else if (t_repeat < 0.66) {
-				// Violet → Rose/Magenta
-				c.r = 128 + (int)((t_repeat - 0.33) * 3 * 127);
-				c.g = (int)((t_repeat - 0.33) * 3 * 100);
-				c.b = 200 + (int)((t_repeat - 0.33) * 3 * 55);
-			} else {
-				// Rose → Blanc
-				c.r = 255;
-				c.g = 100 + (int)((t_repeat - 0.66) * 3 * 155);
-				c.b = 255;
-			}
-			f->cmatrix[xpixel * j + i] = c;
-		}
-	}
-#ifdef HAVE_OPENMP
-	} // Fin de la région parallèle
-#endif
-}
-
-/* Palette Smooth Rainbow : Arc-en-ciel complet */
-void FractalColorSmoothRainbow(fractal* f) {
-	int j;
-	int xpixel = f->xpixel;
-	int ypixel = f->ypixel;
-	int iterMax = f->iterationMax;
-
-#ifdef HAVE_OPENMP
-	#pragma omp parallel
-	{
-		#pragma omp for schedule(static) nowait
-		for (j = 0; j < ypixel; j++) {
-#else
-	for (j = 0; j < ypixel; j++) {
-#endif
-		int i;
-		for (i = 0; i < xpixel; i++) {
-			int iteration = f->fmatrix[xpixel * j + i];
-			color c;
-
-			// Points dans l'ensemble : noir
-			if (iteration >= iterMax) {
-				c.r = 0;
-				c.g = 0;
-				c.b = 0;
-				f->cmatrix[xpixel * j + i] = c;
-				continue;
-			}
-
-			double t = Fractal_SmoothIteration(f, i, j);
-			// Répéter la palette selon colorRepeat de 0 au bailout
-			double repeatCount = (double)f->colorRepeat;
-			double cycle = floor(t * repeatCount);
-			double t_repeat = fmod(t * repeatCount, 1.0);
-			if ((int)cycle % 2 == 1) {
-				t_repeat = 1.0 - t_repeat;
-			}
-			// 6 segments pour l'arc-en-ciel
-			if (t_repeat < 0.166) {
-				// Rouge → Orange
-				c.r = 255;
-				c.g = (int)(t_repeat * 6 * 165);
-				c.b = 0;
-			} else if (t_repeat < 0.333) {
-				// Orange → Jaune
-				c.r = 255;
-				c.g = 165 + (int)((t_repeat - 0.166) * 6 * 90);
-				c.b = 0;
-			} else if (t_repeat < 0.5) {
-				// Jaune → Vert
-				c.r = 255 - (int)((t_repeat - 0.333) * 6 * 255);
-				c.g = 255;
-				c.b = 0;
-			} else if (t_repeat < 0.666) {
-				// Vert → Cyan
-				c.r = 0;
-				c.g = 255;
-				c.b = (int)((t_repeat - 0.5) * 6 * 255);
-			} else if (t_repeat < 0.833) {
-				// Cyan → Bleu
-				c.r = 0;
-				c.g = 255 - (int)((t_repeat - 0.666) * 6 * 255);
-				c.b = 255;
-			} else {
-				// Bleu → Violet/Magenta
-				c.r = (int)((t_repeat - 0.833) * 6 * 180);
-				c.g = 0;
-				c.b = 255;
-			}
-			f->cmatrix[xpixel * j + i] = c;
-		}
-	}
-#ifdef HAVE_OPENMP
-	} // Fin de la région parallèle
-#endif
-}
-
-/* Selection du mode de couleur */
+/* Selection du mode de couleur - using unified colorization system */
 //**********************************
 
 void Fractal_CalculateColorMatrix (fractal* f, SDL_Surface* canvas, void* guiPtr, int* progress, int progressStart, int progressEnd) {
-	int totalPixels = f->xpixel * f->ypixel;
-	int currentPixel = 0;
-	int lastPercent = -1;
-	int progressInterval = totalPixels / 100;
-	if (progressInterval < 1) progressInterval = 1;
 	const char* fractalName = Fractal_GetTypeName(f->type);
+	const gradient_table* gradient;
 
 	// Réutilisation de cmatrix si déjà valide pour le colorMode et colorRepeat actuel
-	if (f->cmatrix_valid && f->last_colorMode == f->colorMode) {
+	if (f->cmatrix_valid && f->last_colorMode == f->colorMode && f->last_colorRepeat == f->colorRepeat) {
 		// Sauter le calcul, mettre à jour la progression directement
 		if (guiPtr != NULL && progress != NULL) {
 			*progress = progressEnd;
@@ -1794,40 +1526,19 @@ void Fractal_CalculateColorMatrix (fractal* f, SDL_Surface* canvas, void* guiPtr
 		return;
 	}
 
-	switch (f->colorMode) {
-		case 0: FractalColorSmoothFire(f); break;
-		case 1: FractalColorSmoothOcean(f); break;
-		case 2: FractalColorSmoothForest(f); break;
-		case 3: FractalColorSmoothViolet(f); break;
-		case 4: FractalColorSmoothRainbow(f); break;
-		default: FractalColorSmoothFire(f);
-	}
+	// Use the unified colorization system
+	gradient = Colorization_GetPalette(f->colorMode);
+	Fractal_ApplyGradient(f, gradient);
 
 	// Marquer cmatrix comme valide
 	f->cmatrix_valid = 1;
 	f->last_colorMode = f->colorMode;
-	
+	f->last_colorRepeat = f->colorRepeat;
+
 	// Mise à jour de la progression après colorisation
-	// On simule la progression en parcourant les pixels
-	if (guiPtr != NULL) {
-		for (int j = 0; j < f->ypixel; j++) {
-			for (int i = 0; i < f->xpixel; i++) {
-				if (currentPixel % progressInterval == 0) {
-					int percent = progressStart + ((currentPixel * (progressEnd - progressStart)) / totalPixels);
-					if (percent != lastPercent && percent <= progressEnd) {
-						SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
-						*progress = percent;
-						lastPercent = percent;
-					}
-				}
-				currentPixel++;
-			}
-		}
-		// Assurer que la progression atteint progressEnd
-		if (*progress < progressEnd) {
-			SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progressEnd, fractalName);
-			*progress = progressEnd;
-		}
+	if (guiPtr != NULL && progress != NULL) {
+		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progressEnd, fractalName);
+		*progress = progressEnd;
 	}
 }
 
@@ -2019,8 +1730,7 @@ void Fractal_ChangeType (fractal* f, int type) {
 	Phoenix_def (f);
 	break;
 	case 8:
-	// Type 8 supprimé (Sierpinski)
-	Mendelbrot_def (f);
+	Buffalo_def (f);
 	break;
 	case 9:
 	Barnsley1j_def (f);
@@ -2118,7 +1828,7 @@ const char* Fractal_GetTypeName(int type) {
 		"Julia Sin",  // 5
 		"Newton",     // 6
 		"Phoenix",    // 7
-		"",           // 8 (supprimé)
+		"Buffalo",    // 8
 		"Barnsley J", // 9
 		"Barnsley M", // 10
 		"Magnet J",   // 11
@@ -2492,6 +2202,44 @@ void BurningShip_def (fractal* f) {
 	f->zoomfactor = 8;
 }
 
+/* Calcul de Buffalo
+ * Formule: z(n+1) = abs(Re(z²)) + i*abs(Im(z²)) + c
+ * C'est une variation du Burning Ship avec abs() sur les deux parties après le carré
+ */
+fractalresult Buffalo_Iteration (fractal f, complex zPixel) {
+	int i=0;
+	complex z;
+	fractalresult result;
+
+	z = f.seed;
+	do {
+		complex zSq;
+		double re_sq, im_sq;
+		i++;
+		// z² = (a+bi)² = (a²-b²) + 2abi
+		zSq = Mulz(z, z);
+		// Appliquer abs() aux deux parties
+		re_sq = fabs(Rez(zSq));
+		im_sq = fabs(Imz(zSq));
+		z = MakeComplex(re_sq + Rez(zPixel), im_sq + Imz(zPixel));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
+
+	result.iteration = i;
+	result.z = z;
+	return result;
+}
+void Buffalo_def (fractal* f) {
+	/* Valeurs de base pour Buffalo */
+	f->xmin = -2.5;
+	f->xmax = 1.5;
+	f->ymin = -2.0;
+	f->ymax = 2.0;
+	f->seed = ZeroSetofComplex();
+	f->bailout= 4;
+	f->iterationMax= 9370;
+	f->zoomfactor = 8;
+}
+
 /* Calcul de Tricorn */
 fractalresult Tricorn_Iteration (fractal f, complex zPixel) {
 	int i=0;
@@ -2692,19 +2440,21 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 		// Convertir densité en couleurs et afficher progressivement
 		if (maxDensity > 0) {
 			double logMaxDensity = log(1 + maxDensity);
+			const gradient_table* gradient = Colorization_GetPalette(f->colorMode);
 			// Afficher toutes les 10 lignes pour performance
 			for (j = 0; j < ypixel; j++) {
 				for (i = 0; i < xpixel; i++) {
 					double density = (double)f->fmatrix[j * xpixel + i];
 					double normalized = log(1 + density) / logMaxDensity;
-					
-					color col;
-					col.r = (int)(normalized * 180);
-					col.g = (int)(normalized * 100);
-					col.b = (int)(normalized * 255);
-					
+
+					colorization_color cc = Gradient_Interpolate(gradient, normalized);
+					/* Update cmatrix for consistency */
+					f->cmatrix[j * xpixel + i].r = cc.r;
+					f->cmatrix[j * xpixel + i].g = cc.g;
+					f->cmatrix[j * xpixel + i].b = cc.b;
+					f->cmatrix[j * xpixel + i].a = 255;
 					pixelRGBA(canvas, (Sint16)(i + decalageX), (Sint16)(j + decalageY),
-					          col.r, col.g, col.b, 255);
+					          cc.r, cc.g, cc.b, 255);
 				}
 				// Mise à jour partielle tous les 10 lignes
 				if (j % 10 == 0 || j == ypixel - 1) {
@@ -2712,7 +2462,7 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 				}
 			}
 		}
-		
+
 		// Mise à jour de la progression
 		if (guiPtr != NULL) {
 			int percent = ((chunk + 1) * 90) / num_chunks; // 90% pour l'échantillonnage
@@ -2784,25 +2534,27 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 		
 		if (maxDensity > 0) {
 			double logMaxDensity = log(1 + maxDensity);
+			const gradient_table* gradient = Colorization_GetPalette(f->colorMode);
 			for (j = 0; j < ypixel; j++) {
 				for (i = 0; i < xpixel; i++) {
 					double density = (double)f->fmatrix[j * xpixel + i];
 					double normalized = log(1 + density) / logMaxDensity;
-					
-					color col;
-					col.r = (int)(normalized * 180);
-					col.g = (int)(normalized * 100);
-					col.b = (int)(normalized * 255);
-					
+
+					colorization_color cc = Gradient_Interpolate(gradient, normalized);
+					/* Update cmatrix for consistency */
+					f->cmatrix[j * xpixel + i].r = cc.r;
+					f->cmatrix[j * xpixel + i].g = cc.g;
+					f->cmatrix[j * xpixel + i].b = cc.b;
+					f->cmatrix[j * xpixel + i].a = 255;
 					pixelRGBA(canvas, (Sint16)(i + decalageX), (Sint16)(j + decalageY),
-					          col.r, col.g, col.b, 255);
+					          cc.r, cc.g, cc.b, 255);
 				}
 				if (j % 10 == 0 || j == ypixel - 1) {
 					SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
 				}
 			}
 		}
-		
+
 		// Mise à jour de la progression
 		if (guiPtr != NULL) {
 			int percent = ((chunk + 1) * 90) / num_chunks;
@@ -3392,6 +3144,56 @@ fractalresult BurningShip_Iteration_GMP (fractal f, complex_gmp zPixel) {
 	return result;
 }
 
+/* Buffalo GMP: z(n+1) = abs(Re(z²)) + i*abs(Im(z²)) + c */
+fractalresult Buffalo_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, zSq;
+	mpf_t mag2, bailout_mpf, abs_real, abs_imag, temp1, temp2;
+	fractalresult result;
+
+	mp_bitcnt_t prec = f.gmp_precision;
+	complex_gmp seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(seed_gmp, prec);
+	complex_gmp_init(&zSq, prec);
+
+	mpf_init2(mag2, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(abs_real, prec);
+	mpf_init2(abs_imag, prec);
+	mpf_init2(temp1, prec);
+	mpf_init2(temp2, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	mpf_mul(bailout_mpf, bailout_mpf, bailout_mpf);  // bailout²
+
+	do {
+		i++;
+		// zSq = z²
+		complex_gmp_sq_to(&zSq, z, &f.mul_temps);
+		// Appliquer abs() aux deux parties de z²
+		mpf_abs(abs_real, zSq.x);
+		mpf_abs(abs_imag, zSq.y);
+		// z = (|Re(z²)|, |Im(z²)|) + c
+		mpf_add(z.x, abs_real, zPixel.x);
+		mpf_add(z.y, abs_imag, zPixel.y);
+		complex_gmp_mag2_to(mag2, z, temp1, temp2);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag2, bailout_mpf) < 0));
+
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&zSq);
+	complex_gmp_clear(&seed_gmp);
+	mpf_clear(mag2);
+	mpf_clear(bailout_mpf);
+	mpf_clear(abs_real);
+	mpf_clear(abs_imag);
+	mpf_clear(temp1);
+	mpf_clear(temp2);
+
+	return result;
+}
+
 fractalresult Tricorn_Iteration_GMP (fractal f, complex_gmp zPixel) {
 	int i = 0;
 	complex_gmp z, zTemp, zConj;
@@ -3635,8 +3437,7 @@ fractalresult FormulaSelector_GMP (fractal f, complex_gmp zPixel) {
 		r = Phoenix_Iteration_GMP(f, zPixel);
 		break;
 	case 8:
-		// Type 8 supprimé (Sierpinski)
-		r = Mendelbrot_Iteration_GMP(f, zPixel);
+		r = Buffalo_Iteration_GMP(f, zPixel);
 		break;
 	case 9:
 		r = Barnsley1j_Iteration_GMP(f, zPixel);
@@ -3699,8 +3500,7 @@ fractalresult FormulaSelector (fractal f, complex zPixel) {
 	r=Phoenix_Iteration (f,zPixel);
 	break;
 	case 8:
-	// Type 8 supprimé (Sierpinski)
-	r = Mendelbrot_Iteration(f, zPixel);
+	r = Buffalo_Iteration(f, zPixel);
 	break;
 	case 9:
 	r=Barnsley1j_Iteration (f,zPixel);

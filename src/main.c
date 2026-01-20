@@ -27,6 +27,7 @@
 #include "SDLGUI.h"
 #include "SDL_gfxPrimitives.h"
 #include "VonKoch.h"
+#include "colorization.h"
 #ifdef HAVE_GMP
 #include <gmp.h>
 #include "precision_detector.h"
@@ -273,9 +274,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			}
 			if (event->key.keysym.sym == SDLK_c)
 			{			// Changer palette de couleur
-				const char* palettes[] = {"SmoothFire", "SmoothOcean", "SmoothForest", "SmoothViolet", "SmoothRainbow"};
-				f->colorMode = (f->colorMode + 1) % 5;
-				printf ("Palette: %s\n", palettes[f->colorMode]);
+				f->colorMode = (f->colorMode + 1) % NUM_PALETTES;
+				printf ("Palette: %s\n", Colorization_GetPaletteName(f->colorMode));
 				if (*typeFractale >= 3) {
 					if (*typeFractale == 16) {
 						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
@@ -426,7 +426,14 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
 				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 			}
-			// F8 supprimé (Sierpinski)
+			if (event->key.keysym.sym == SDLK_F8)
+			{
+				*typeFractale = 8;
+				Fractal_ChangeType (f, 8);
+				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
+				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
+				if (g != NULL) SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
+			}
 			if (event->key.keysym.sym == SDLK_F9)
 			{
 				*typeFractale = 13;

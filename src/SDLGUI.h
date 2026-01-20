@@ -21,7 +21,7 @@ typedef struct {  // Un menu utilisable ??
 int x,y,w,h;
 } menu;
 
-typedef struct {   // barre de boutton
+typedef struct gui_struct {   // barre de boutton
   int x,y,w,h;      // Largeur et hauteur barre de boutton
   int stateH;	    // Bad hack to add state bar
   Uint32 bgcolor;    // La couleur de fond
@@ -30,6 +30,8 @@ typedef struct {   // barre de boutton
   int xplace;        // xplace correspond a x=2 l'ecran
   int xplaceMax;     // Valeur Maximale de xplace
   int barh,barw;     // Largeur de la barre de deplacement
+  int selectedType;  // Type de fractale actuellement sélectionné (1-17)
+  int hoverButton;   // Bouton survolé (-1 si aucun)
 } gui;
 
 extern gui SDLGUI_Init (int, int, int, int, int, Uint32, int);

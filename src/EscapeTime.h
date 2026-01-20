@@ -10,6 +10,7 @@
 #include "config.h"
 #include "SDL.h"
 #include "complexmath.h"
+#include "color_types.h"
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif
@@ -18,11 +19,6 @@
 #include "complexmath_gmp.h"
 #include "gmp_pool.h"
 #endif
-
-// A portable color type.
-typedef struct {
-  int r, g, b, a;
-} color;
 
 // Structure de cache pour réutilisation lors de zooms
 typedef struct {
@@ -34,7 +30,7 @@ typedef struct {
 } fractal_cache;
 
 // Create a new fractal type
-typedef struct {
+typedef struct fractal_struct {
   int xpixel, ypixel;
   double xmin, xmax, ymin, ymax;
   complex seed;
@@ -42,10 +38,11 @@ typedef struct {
   int bailout;
   int zoomfactor;
   int type;
-  int colorMode;   // 0=SmoothFire, 1=SmoothOcean
+  int colorMode;   // 0-7 for different palettes (see colorization.h)
   int cmatrix_valid;   // 1 si cmatrix est valide pour le colorMode actuel
   int last_colorMode;  // colorMode lors du dernier calcul de cmatrix
   int colorRepeat;  // Nombre de répétitions du gradient de couleur (2-20, de 2 en 2)
+  int last_colorRepeat;  // colorRepeat lors du dernier calcul de cmatrix
   double zoom_level;   // Niveau de zoom actuel pour détection de changement
   int *fmatrix;    // la matrice d'iteration
   complex *zmatrix;  // la matrice de la valeur de z a la derniere iteration
@@ -104,6 +101,7 @@ void Fractal_ChangeType (fractal* f, int type);
 fractalresult Barnsleyj1_Iteration (fractal, complex);
 fractalresult Barnsleym1_Iteration (fractal, complex);
 fractalresult BurningShip_Iteration (fractal, complex);
+fractalresult Buffalo_Iteration (fractal, complex);
 fractalresult Tricorn_Iteration (fractal, complex);
 fractalresult Mandelbulb_Iteration (fractal, complex);
 
@@ -118,6 +116,7 @@ fractalresult Phoenix_Iteration_GMP (fractal, complex_gmp);
 fractalresult Barnsleyj1_Iteration_GMP (fractal, complex_gmp);
 fractalresult Barnsleym1_Iteration_GMP (fractal, complex_gmp);
 fractalresult BurningShip_Iteration_GMP (fractal, complex_gmp);
+fractalresult Buffalo_Iteration_GMP (fractal, complex_gmp);
 fractalresult Tricorn_Iteration_GMP (fractal, complex_gmp);
 fractalresult Mandelbulb_Iteration_GMP (fractal, complex_gmp);
 #endif
@@ -133,6 +132,7 @@ void Barnsley1m_def (fractal* f);
 void Magnet1j_def (fractal* f);
 void Magnet1m_def (fractal* f);
 void BurningShip_def (fractal* f);
+void Buffalo_def (fractal* f);
 void Tricorn_def (fractal* f);
 void Mandelbulb_def (fractal* f);
 void Buddhabrot_def (fractal* f);

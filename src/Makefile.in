@@ -117,21 +117,22 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am__fractall_SOURCES_DIST = main.c complexmath.c complexmath.h \
-	EscapeTime.c EscapeTime.h exception.c exception.h \
-	SDL_gfxPrimitives.c SDL_gfxPrimitives.h \
-	SDL_gfxPrimitives_font.h SDLGUI.c SDLGUI.h SDL_imageFilter.c \
-	SDL_imageFilter.h SDL_rotozoom.c SDL_rotozoom.h VonKoch.c \
-	VonKoch.h complexmath_simd.c complexmath_gmp.c \
-	complexmath_gmp.h precision_detector.c precision_detector.h \
-	gmp_pool.c gmp_pool.h
+	color_types.h colorization.c colorization.h EscapeTime.c \
+	EscapeTime.h exception.c exception.h SDL_gfxPrimitives.c \
+	SDL_gfxPrimitives.h SDL_gfxPrimitives_font.h SDLGUI.c SDLGUI.h \
+	SDL_imageFilter.c SDL_imageFilter.h SDL_rotozoom.c \
+	SDL_rotozoom.h VonKoch.c VonKoch.h complexmath_simd.c \
+	complexmath_gmp.c complexmath_gmp.h precision_detector.c \
+	precision_detector.h gmp_pool.c gmp_pool.h
 @HAVE_SSE4_1_TRUE@am__objects_1 = complexmath_simd.$(OBJEXT)
 @HAVE_GMP_TRUE@am__objects_2 = complexmath_gmp.$(OBJEXT) \
 @HAVE_GMP_TRUE@	precision_detector.$(OBJEXT) gmp_pool.$(OBJEXT)
 am_fractall_OBJECTS = main.$(OBJEXT) complexmath.$(OBJEXT) \
-	EscapeTime.$(OBJEXT) exception.$(OBJEXT) \
-	SDL_gfxPrimitives.$(OBJEXT) SDLGUI.$(OBJEXT) \
-	SDL_imageFilter.$(OBJEXT) SDL_rotozoom.$(OBJEXT) \
-	VonKoch.$(OBJEXT) $(am__objects_1) $(am__objects_2)
+	colorization.$(OBJEXT) EscapeTime.$(OBJEXT) \
+	exception.$(OBJEXT) SDL_gfxPrimitives.$(OBJEXT) \
+	SDLGUI.$(OBJEXT) SDL_imageFilter.$(OBJEXT) \
+	SDL_rotozoom.$(OBJEXT) VonKoch.$(OBJEXT) $(am__objects_1) \
+	$(am__objects_2)
 fractall_OBJECTS = $(am_fractall_OBJECTS)
 fractall_DEPENDENCIES =
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -159,10 +160,11 @@ am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/EscapeTime.Po ./$(DEPDIR)/SDLGUI.Po \
 	./$(DEPDIR)/SDL_gfxPrimitives.Po \
 	./$(DEPDIR)/SDL_imageFilter.Po ./$(DEPDIR)/SDL_rotozoom.Po \
-	./$(DEPDIR)/VonKoch.Po ./$(DEPDIR)/complexmath.Po \
-	./$(DEPDIR)/complexmath_gmp.Po ./$(DEPDIR)/complexmath_simd.Po \
-	./$(DEPDIR)/exception.Po ./$(DEPDIR)/gmp_pool.Po \
-	./$(DEPDIR)/main.Po ./$(DEPDIR)/precision_detector.Po
+	./$(DEPDIR)/VonKoch.Po ./$(DEPDIR)/colorization.Po \
+	./$(DEPDIR)/complexmath.Po ./$(DEPDIR)/complexmath_gmp.Po \
+	./$(DEPDIR)/complexmath_simd.Po ./$(DEPDIR)/exception.Po \
+	./$(DEPDIR)/gmp_pool.Po ./$(DEPDIR)/main.Po \
+	./$(DEPDIR)/precision_detector.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -344,8 +346,9 @@ AM_CPPFLAGS = \
 
 AM_CFLAGS = -g $(am__append_2) $(am__append_3) $(am__append_4) \
 	$(am__append_6)
-fractall_SOURCES = main.c complexmath.c complexmath.h EscapeTime.c \
-	EscapeTime.h exception.c exception.h SDL_gfxPrimitives.c \
+fractall_SOURCES = main.c complexmath.c complexmath.h color_types.h \
+	colorization.c colorization.h EscapeTime.c EscapeTime.h \
+	exception.c exception.h SDL_gfxPrimitives.c \
 	SDL_gfxPrimitives.h SDL_gfxPrimitives_font.h SDLGUI.c SDLGUI.h \
 	SDL_imageFilter.c SDL_imageFilter.h SDL_rotozoom.c \
 	SDL_rotozoom.h VonKoch.c VonKoch.h $(am__append_1) \
@@ -454,6 +457,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/SDL_imageFilter.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/SDL_rotozoom.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/VonKoch.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/colorization.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/complexmath.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/complexmath_gmp.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/complexmath_simd.Po@am__quote@ # am--include-marker
@@ -627,6 +631,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/SDL_imageFilter.Po
 	-rm -f ./$(DEPDIR)/SDL_rotozoom.Po
 	-rm -f ./$(DEPDIR)/VonKoch.Po
+	-rm -f ./$(DEPDIR)/colorization.Po
 	-rm -f ./$(DEPDIR)/complexmath.Po
 	-rm -f ./$(DEPDIR)/complexmath_gmp.Po
 	-rm -f ./$(DEPDIR)/complexmath_simd.Po
@@ -685,6 +690,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/SDL_imageFilter.Po
 	-rm -f ./$(DEPDIR)/SDL_rotozoom.Po
 	-rm -f ./$(DEPDIR)/VonKoch.Po
+	-rm -f ./$(DEPDIR)/colorization.Po
 	-rm -f ./$(DEPDIR)/complexmath.Po
 	-rm -f ./$(DEPDIR)/complexmath_gmp.Po
 	-rm -f ./$(DEPDIR)/complexmath_simd.Po
