@@ -348,11 +348,15 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				}
 			}
 			if (event->key.keysym.sym == SDLK_r)
-			{			// Changer nombre de répétitions du gradient (2, 4, 6, 8, 10, 12, 14, 16, 18, 20)
-				// Valeurs possibles : 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 (de 2 en 2)
+			{			// Changer nombre de répétitions du gradient (2 à 40, de 2 en 2)
+				// Valeurs possibles : 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40 (de 2 en 2)
 				// Trouver la prochaine valeur paire dans la séquence
 				int current = f->colorRepeat;
-				int next = ((current / 2) % 10 + 1) * 2;  // Cycle : 2, 4, 6, 8, 10, 12, 14, 16, 18, 20
+				// Normaliser current dans la plage valide [2, 40]
+				if (current < 2) current = 2;
+				if (current > 40) current = 40;
+				int next = ((current / 2) % 20 + 1) * 2;  // Cycle : 2, 4, 6, ..., 38, 40
+				if (next > 40) next = 2;  // Retour au début après 40
 				f->colorRepeat = next;
 				f->cmatrix_valid = 0;  // Invalider pour forcer le recalcul
 				printf ("Répétitions du gradient: %d\n", f->colorRepeat);

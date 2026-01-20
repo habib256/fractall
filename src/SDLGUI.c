@@ -360,7 +360,7 @@ void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMod
 	if (type >= 1 && type <= 23 && typeName[0] != '\0') {
 		// Récupérer les informations supplémentaires depuis la structure fractal
 		int iterationMax = (f != NULL) ? f->iterationMax : 0;
-		int colorRepeat = (f != NULL) ? f->colorRepeat : 20;
+		int colorRepeat = (f != NULL) ? f->colorRepeat : 40;
 		
 		// Afficher le zoom en notation adaptée selon la valeur
 		if (zoomFactor >= 1e6) {

@@ -70,7 +70,7 @@ fractall [OPTIONS]
 | **Clic gauche + glisser** | Sélection de zone rectangulaire pour zoom précis (escape-time uniquement) |
 | **Clic droit** | Dézoom / -1 itération |
 | **C** | Changer palette |
-| **R** | Changer nombre de répétitions du gradient (2, 4, 6, 8, 10, 12, 14, 16, 18, 20) - Par défaut : 20 pour escape-time, 2 pour Lyapunov |
+| **R** | Changer nombre de répétitions du gradient (2 à 40, de 2 en 2) - Par défaut : 40 pour escape-time, 2 pour Lyapunov |
 | **S** | Screenshot (Screenshot.png avec métadonnées, fallback BMP si PNG indisponible) |
 | **Q/ESC** | Quitter |
 
@@ -204,7 +204,7 @@ typedef struct fractal_struct {
   int colorMode;            // 0=SmoothFire, 1=SmoothOcean, 2=SmoothForest, 3=SmoothViolet, 4=SmoothRainbow, 5=SmoothSunset, 6=SmoothPlasma (défaut), 7=SmoothIce, 8=SmoothCosmic
   int cmatrix_valid;        // 1 si cmatrix est valide pour le colorMode actuel
   int last_colorMode;       // colorMode lors du dernier calcul de cmatrix
-  int colorRepeat;           // Nombre de répétitions du gradient (2-20, de 2 en 2)
+  int colorRepeat;           // Nombre de répétitions du gradient (2-40, de 2 en 2)
   int last_colorRepeat;      // colorRepeat lors du dernier calcul de cmatrix
   double zoom_level;         // Niveau de zoom actuel pour détection de changement
   int *fmatrix;              // Matrice d'itérations
@@ -226,8 +226,8 @@ typedef struct fractal_struct {
 **Notes importantes** :
 - Le système de cache (`fractal_cache`) permet de réutiliser les calculs lors de zooms successifs pour améliorer les performances
 - `cmatrix_valid` et `last_colorMode`/`last_colorRepeat` permettent d'éviter le recalcul de la colorisation si seule la palette ou les répétitions changent
-- `colorRepeat` : nombre de répétitions du gradient (2, 4, 6, 8, 10, 12, 14, 16, 18, 20) - modifiable avec la touche **R**
-  - Valeur par défaut : **20** pour les fractales escape-time (types 3-16, 18-23)
+- `colorRepeat` : nombre de répétitions du gradient (2 à 40, de 2 en 2) - modifiable avec la touche **R**
+  - Valeur par défaut : **40** pour les fractales escape-time (types 3-16, 18-23)
   - Valeur par défaut : **2** pour Lyapunov (type 17)
 - Avec GMP, `iteration_ctx` et `mul_temps` sont des structures pré-allouées pour optimiser les allocations mémoire lors des itérations
 
@@ -417,7 +417,7 @@ Mettre en évidence le bouton de la fractale actuellement sélectionnée (bordur
 #### 3. Panneau de contrôle latéral (optionnel)
 Ajouter un panneau rétractable avec :
 - Sélecteur de palette (liste déroulante ou boutons colorés)
-- Slider pour colorRepeat (2-20)
+- Slider pour colorRepeat (2-40)
 - Affichage des coordonnées en temps réel
 - Bouton Reset (retour aux coordonnées par défaut)
 

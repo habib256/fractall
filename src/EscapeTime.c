@@ -64,11 +64,11 @@ fractal Fractal_Init (int screenW, int screenH, int type) {
 	f.cmatrix_valid = 0;
 	f.last_colorMode = -1;
 	f.last_colorRepeat = -1;
-	// Répétition par défaut selon le type : 20 pour escape-time, 2 pour Lyapunov
+	// Répétition par défaut selon le type : 40 pour escape-time, 2 pour Lyapunov
 	if (type == 17) {
 		f.colorRepeat = 2;  // 2 répétitions pour Lyapunov
 	} else {
-		f.colorRepeat = 20;  // 20 répétitions pour escape-time
+		f.colorRepeat = 40;  // 40 répétitions pour escape-time
 	}
 	f.zoom_level = 1.0;  // Niveau de zoom initial
 	// Initialiser le cache
@@ -1942,7 +1942,7 @@ void Fractal_ChangeType (fractal* f, int type) {
 	if (type == 17) {
 		f->colorRepeat = 2;  // 2 répétitions pour Lyapunov
 	} else {
-		f->colorRepeat = 20;  // 20 répétitions pour escape-time
+		f->colorRepeat = 40;  // 40 répétitions pour escape-time
 	}
 
 	switch (type)
@@ -2910,9 +2910,16 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 	double xrange = f->xmax - f->xmin;
 	double yrange = f->ymax - f->ymin;
 
+	// Vérifications de sécurité
+	if (f == NULL || f->fmatrix == NULL || f->cmatrix == NULL) {
+		fprintf(stderr, "Erreur: structure fractale invalide pour Buddhabrot\n");
+		return 0;
+	}
+
 	// Protection contre division par zéro
-	if (xrange <= 0.0 || yrange <= 0.0) {
-		fprintf(stderr, "Erreur: coordonnées dégénérées pour Buddhabrot (xrange=%f, yrange=%f)\n", xrange, yrange);
+	if (xrange <= 0.0 || yrange <= 0.0 || xpixel <= 0 || ypixel <= 0 || iterMax <= 0) {
+		fprintf(stderr, "Erreur: paramètres invalides pour Buddhabrot (xrange=%f, yrange=%f, xpixel=%d, ypixel=%d, iterMax=%d)\n", 
+		        xrange, yrange, xpixel, ypixel, iterMax);
 		return 0;
 	}
 
@@ -2928,22 +2935,41 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 		f->fmatrix[i] = 0;
 	}
 
-	// Nombre d'échantillons proportionnel à la surface
-	numSamples = xpixel * ypixel * 50;
+	// Nombre d'échantillons adaptatif selon la résolution
+	// Utiliser une formule qui évolue mieux avec la résolution
+	// Base : ~10-20 échantillons par pixel pour une bonne qualité
+	// Réduire pour les grandes résolutions pour éviter les temps de calcul excessifs
+	int pixels = xpixel * ypixel;
+	if (pixels <= 640*480) {
+		// Petites résolutions : plus d'échantillons par pixel
+		numSamples = pixels * 20;
+	} else if (pixels <= 1024*768) {
+		// Résolutions moyennes : nombre modéré
+		numSamples = pixels * 10;
+	} else {
+		// Grandes résolutions : moins d'échantillons pour garder des temps raisonnables
+		numSamples = pixels * 5;
+	}
+	
 #ifdef HAVE_GMP
 	// Réduire les échantillons avec GMP car le calcul est plus lent
 	if (f->use_gmp) {
-		numSamples = xpixel * ypixel * 5;
+		numSamples = numSamples / 10;
+		if (numSamples < 1000) numSamples = 1000;  // Minimum pour GMP
 	}
 #endif
 
+	// Limiter numSamples pour éviter les débordements et temps excessifs
+	if (numSamples < 1000) numSamples = 1000;
+	if (numSamples > 50000000) numSamples = 50000000;  // Limite raisonnable (~50M)
+
 	// Taille des chunks pour rendu incrémental (affichage progressif)
-	// Chunks plus petits pour une meilleure réactivité de l'interface
-	int chunk_size = 500;
-	if (chunk_size > numSamples / 10) {
-		chunk_size = numSamples / 10;
+	// Chunks plus grands pour réduire la fréquence de rendu (améliore les performances)
+	int chunk_size = 5000;  // Augmenté de 500 à 5000 pour moins de rendus
+	if (chunk_size > numSamples / 5) {
+		chunk_size = numSamples / 5;  // Maximum 5 chunks pour le rendu progressif
 	}
-	if (chunk_size < 50) chunk_size = 50;
+	if (chunk_size < 1000) chunk_size = 1000;  // Minimum 1000 échantillons par chunk
 	int num_chunks = (numSamples + chunk_size - 1) / chunk_size;
 
 	// Mise à jour initiale de la progression
@@ -2953,54 +2979,121 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 
 	// Phase 1: Échantillonnage parallèle avec OpenMP et rendu incrémental
 #ifdef HAVE_OPENMP
+	// Variable de cancellation partagée pour arrêt rapide
+	volatile int cancelled = 0;
+	
 	// Rendu incrémental par chunks
 	for (int chunk = 0; chunk < num_chunks; chunk++) {
+		// Vérifier l'annulation AVANT de commencer chaque chunk
+		if (check_events_and_cancel()) {
+			printf("Calcul Buddhabrot annulé par l'utilisateur\n");
+			cancelled = 1;
+			break;
+		}
+		
+		// Si déjà annulé, sortir
+		if (cancelled) break;
+		
 		int chunk_start = chunk * chunk_size;
 		int chunk_end = (chunk_start + chunk_size < numSamples) ? chunk_start + chunk_size : numSamples;
 		
 		#pragma omp parallel
 		{
-			// Variables thread-local
-			unsigned int seed = 42 + omp_get_thread_num() * 1000 + chunk * 10000;
+			// Variables thread-local pour génération aléatoire thread-safe
+			unsigned int thread_id = omp_get_thread_num();
+			unsigned int seed = (unsigned int)(42 + thread_id * 1000 + chunk * 10000);
+			// Allouer les buffers une seule fois par thread (réutilisés entre chunks)
 			double *trajX = (double*) malloc(iterMax * sizeof(double));
 			double *trajY = (double*) malloc(iterMax * sizeof(double));
 
 			if (trajX != NULL && trajY != NULL) {
-				#pragma omp for schedule(dynamic, 100) nowait
+				// Retirer nowait pour permettre la synchronisation et vérification d'annulation
+				#pragma omp for schedule(dynamic, 500)
 				for (int sample = chunk_start; sample < chunk_end; sample++) {
+					// Vérifier l'annulation périodiquement dans la boucle (tous les 1000 échantillons)
+					if (cancelled || (sample % 1000 == 0 && check_events_and_cancel())) {
+						cancelled = 1;
+						continue;  // Passer au suivant, la boucle se terminera naturellement
+					}
+					
+					if (cancelled) continue;
 					// Générer un point c aléatoire (thread-safe)
-					double xg = ((double)rand_r(&seed) / RAND_MAX) * xrange + xmin;
-					double yg = ((double)rand_r(&seed) / RAND_MAX) * yrange + ymin;
+					// Utiliser une fonction de hash simple si rand_r n'est pas disponible
+					seed = seed * 1103515245 + 12345;  // LCG simple
+					double xg = ((double)(seed & 0x7FFFFFFF) / 2147483647.0) * xrange + xmin;
+					seed = seed * 1103515245 + 12345;
+					double yg = ((double)(seed & 0x7FFFFFFF) / 2147483647.0) * yrange + ymin;
+					
 					complex c = MakeComplex(xg, yg);
 					complex z = ZeroSetofComplex();
 
-					// Itérer et stocker la trajectoire
+					// Itérer et stocker la trajectoire avec early exit optimisé
 					int escaped = 0;
 					int iter;
+					double mag2_z = 0.0;  // Cache pour Magz(z)^2 pour éviter recalculs
+					
+					// Early exit : si après quelques itérations le point ne s'échappe pas,
+					// il est probablement dans l'ensemble de Mandelbrot
+					int early_exit_threshold = (iterMax < 50) ? iterMax / 2 : 50;
+					
 					for (iter = 0; iter < iterMax; iter++) {
 						complex zTemp = Mulz(z, z);
 						z = Addz(zTemp, c);
 
-						trajX[iter] = Rez(z);
-						trajY[iter] = Imz(z);
+						// Vérifier NaN/Inf avant de stocker
+						double zx = Rez(z);
+						double zy = Imz(z);
+						if (isnan(zx) || isnan(zy) || isinf(zx) || isinf(zy)) {
+							break;  // Arrêter si valeur invalide
+						}
 
-						if (Magz(z) > bailout) {
+						// Calculer mag2 une seule fois
+						mag2_z = zx * zx + zy * zy;
+						
+						// Early exit : si après plusieurs itérations, le point est encore proche de l'origine,
+						// il ne s'échappera probablement pas
+						if (iter == early_exit_threshold && mag2_z < 0.25) {
+							break;  // Probablement dans l'ensemble, arrêter
+						}
+
+						trajX[iter] = zx;
+						trajY[iter] = zy;
+
+						if (mag2_z > bailout * bailout) {  // Comparer mag2 au lieu de Magz()
 							escaped = 1;
 							break;
 						}
 					}
 
 					// Si le point s'échappe, tracer sa trajectoire
-					if (escaped) {
-						for (int i = 0; i < iter; i++) {
-							// Convertir coordonnées complexes en pixels
-							int px = (int)((trajX[i] - xmin) / xrange * xpixel);
-							int py = (int)((trajY[i] - ymin) / yrange * ypixel);
+					if (escaped && iter > 0) {
+						for (int traj_idx = 0; traj_idx < iter; traj_idx++) {
+							// Vérifier que les valeurs sont valides
+							if (isnan(trajX[traj_idx]) || isnan(trajY[traj_idx]) ||
+							    isinf(trajX[traj_idx]) || isinf(trajY[traj_idx])) {
+								continue;  // Ignorer les valeurs invalides
+							}
 
-							// Vérifier les limites et incrémenter la densité (atomic pour éviter race condition)
+							// Convertir coordonnées complexes en pixels
+							double px_d = (trajX[traj_idx] - xmin) / xrange * xpixel;
+							double py_d = (trajY[traj_idx] - ymin) / yrange * ypixel;
+							
+							// Vérifier les limites avant conversion
+							if (px_d < 0.0 || px_d >= (double)xpixel || 
+							    py_d < 0.0 || py_d >= (double)ypixel) {
+								continue;  // Ignorer les pixels hors limites
+							}
+
+							int px = (int)px_d;
+							int py = (int)py_d;
+
+							// Double vérification des limites (protection supplémentaire)
 							if (px >= 0 && px < xpixel && py >= 0 && py < ypixel) {
-								#pragma omp atomic
-								f->fmatrix[py * xpixel + px]++;
+								int idx = py * xpixel + px;
+								if (idx >= 0 && idx < xpixel * ypixel) {
+									#pragma omp atomic
+									f->fmatrix[idx]++;
+								}
 							}
 						}
 					}
@@ -3017,50 +3110,73 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 		} // Fin région parallèle pour ce chunk
 		
 		// Après chaque chunk : normaliser, coloriser et afficher progressivement
-		// Trouver la densité maximale actuelle
-		maxDensity = 1;
-		for (i = 0; i < xpixel * ypixel; i++) {
-			if (f->fmatrix[i] > maxDensity) {
-				maxDensity = f->fmatrix[i];
+		// Ne rendre que tous les N chunks pour améliorer les performances
+		// (rendre moins fréquemment réduit le temps total)
+		if (chunk % 2 == 0 || chunk == num_chunks - 1) {  // Rendre tous les 2 chunks + le dernier
+			// Trouver la densité maximale actuelle
+			maxDensity = 1;
+			for (i = 0; i < xpixel * ypixel; i++) {
+				if (f->fmatrix[i] > maxDensity) {
+					maxDensity = f->fmatrix[i];
+				}
 			}
+			
+			// Convertir densité en couleurs et afficher progressivement
+			if (maxDensity > 0) {
+				double logMaxDensity = log(1.0 + (double)maxDensity);
+				// Protection contre division par zéro ou logMaxDensity invalide
+				if (logMaxDensity > 0.0 && !isnan(logMaxDensity) && !isinf(logMaxDensity)) {
+					const gradient_table* gradient = Colorization_GetPalette(f->colorMode);
+					if (gradient != NULL) {
+						// Précalculer 1/logMaxDensity pour éviter les divisions répétées
+						double inv_logMaxDensity = 1.0 / logMaxDensity;
+						
+						// Afficher toutes les 20 lignes pour performance (au lieu de 10)
+						for (j = 0; j < ypixel; j++) {
+							for (i = 0; i < xpixel; i++) {
+								int idx = j * xpixel + i;
+								if (idx >= 0 && idx < xpixel * ypixel) {
+									double density = (double)f->fmatrix[idx];
+									double normalized = log(1.0 + density) * inv_logMaxDensity;
+									
+									// Clamper la valeur normalisée entre 0 et 1
+									if (normalized < 0.0) normalized = 0.0;
+									else if (normalized > 1.0) normalized = 1.0;
+									if (isnan(normalized) || isinf(normalized)) normalized = 0.0;
+
+									colorization_color cc = Gradient_Interpolate(gradient, normalized);
+									/* Update cmatrix for consistency */
+									f->cmatrix[idx].r = cc.r;
+									f->cmatrix[idx].g = cc.g;
+									f->cmatrix[idx].b = cc.b;
+									f->cmatrix[idx].a = 255;
+									pixelRGBA(canvas, (Sint16)(i + decalageX), (Sint16)(j + decalageY),
+									          cc.r, cc.g, cc.b, 255);
+								}
+							}
+							// Mise à jour partielle tous les 20 lignes (au lieu de 10)
+							if (j % 20 == 0 || j == ypixel - 1) {
+								SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Vérifier l'annulation après chaque chunk (synchronisation implicite à la fin de la région parallèle)
+		if (check_events_and_cancel()) {
+			printf("Calcul Buddhabrot annulé par l'utilisateur\n");
+			cancelled = 1;
 		}
 		
-		// Convertir densité en couleurs et afficher progressivement
-		if (maxDensity > 0) {
-			double logMaxDensity = log(1 + maxDensity);
-			const gradient_table* gradient = Colorization_GetPalette(f->colorMode);
-			// Afficher toutes les 10 lignes pour performance
-			for (j = 0; j < ypixel; j++) {
-				for (i = 0; i < xpixel; i++) {
-					double density = (double)f->fmatrix[j * xpixel + i];
-					double normalized = log(1 + density) / logMaxDensity;
-
-					colorization_color cc = Gradient_Interpolate(gradient, normalized);
-					/* Update cmatrix for consistency */
-					f->cmatrix[j * xpixel + i].r = cc.r;
-					f->cmatrix[j * xpixel + i].g = cc.g;
-					f->cmatrix[j * xpixel + i].b = cc.b;
-					f->cmatrix[j * xpixel + i].a = 255;
-					pixelRGBA(canvas, (Sint16)(i + decalageX), (Sint16)(j + decalageY),
-					          cc.r, cc.g, cc.b, 255);
-				}
-				// Mise à jour partielle tous les 10 lignes
-				if (j % 10 == 0 || j == ypixel - 1) {
-					SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
-				}
-			}
-		}
-
+		// Si annulé, sortir de la boucle des chunks
+		if (cancelled) break;
+		
 		// Mise à jour de la progression
 		if (guiPtr != NULL) {
 			int percent = ((chunk + 1) * 90) / num_chunks; // 90% pour l'échantillonnage
 			SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, "Buddhabrot");
-		}
-		
-		// Vérifier annulation utilisateur
-		if (check_events_and_cancel()) {
-			printf("Calcul Buddhabrot annulé par l'utilisateur\n");
-			break;
 		}
 	}
 #else
@@ -3076,69 +3192,150 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 
 	// Rendu incrémental par chunks (version séquentielle)
 	for (int chunk = 0; chunk < num_chunks; chunk++) {
+		// Vérifier l'annulation AVANT de commencer chaque chunk
+		if (check_events_and_cancel()) {
+			printf("Calcul Buddhabrot annulé par l'utilisateur\n");
+			free(trajX);
+			free(trajY);
+			return SDL_GetTicks() - time;
+		}
+		
 		int chunk_start = chunk * chunk_size;
 		int chunk_end = (chunk_start + chunk_size < numSamples) ? chunk_start + chunk_size : numSamples;
 		
 		for (int sample = chunk_start; sample < chunk_end; sample++) {
+			// Vérifier l'annulation périodiquement (tous les 1000 échantillons)
+			if (sample % 1000 == 0 && check_events_and_cancel()) {
+				printf("Calcul Buddhabrot annulé par l'utilisateur\n");
+				free(trajX);
+				free(trajY);
+				return SDL_GetTicks() - time;
+			}
 			double xg = ((double)rand() / RAND_MAX) * xrange + xmin;
 			double yg = ((double)rand() / RAND_MAX) * yrange + ymin;
 			complex c = MakeComplex(xg, yg);
 			complex z = ZeroSetofComplex();
 
+			// Itérer et stocker la trajectoire avec early exit optimisé
 			int escaped = 0;
 			int iter;
+			double mag2_z = 0.0;  // Cache pour Magz(z)^2 pour éviter recalculs
+			
+			// Early exit : si après quelques itérations le point ne s'échappe pas,
+			// il est probablement dans l'ensemble de Mandelbrot
+			int early_exit_threshold = (iterMax < 50) ? iterMax / 2 : 50;
+			
 			for (iter = 0; iter < iterMax; iter++) {
 				complex zTemp = Mulz(z, z);
 				z = Addz(zTemp, c);
 
-				trajX[iter] = Rez(z);
-				trajY[iter] = Imz(z);
+				// Vérifier NaN/Inf avant de stocker
+				double zx = Rez(z);
+				double zy = Imz(z);
+				if (isnan(zx) || isnan(zy) || isinf(zx) || isinf(zy)) {
+					break;  // Arrêter si valeur invalide
+				}
 
-				if (Magz(z) > bailout) {
+				// Calculer mag2 une seule fois
+				mag2_z = zx * zx + zy * zy;
+				
+				// Early exit : si après plusieurs itérations, le point est encore proche de l'origine,
+				// il ne s'échappera probablement pas
+				if (iter == early_exit_threshold && mag2_z < 0.25) {
+					break;  // Probablement dans l'ensemble, arrêter
+				}
+
+				trajX[iter] = zx;
+				trajY[iter] = zy;
+
+				if (mag2_z > bailout * bailout) {  // Comparer mag2 au lieu de Magz()
 					escaped = 1;
 					break;
 				}
 			}
 
-			if (escaped) {
-				for (int i = 0; i < iter; i++) {
-					int px = (int)((trajX[i] - xmin) / xrange * xpixel);
-					int py = (int)((trajY[i] - ymin) / yrange * ypixel);
+				// Précalculer les constantes pour optimiser la conversion
+				double inv_xrange = 1.0 / xrange;
+				double inv_yrange = 1.0 / yrange;
+				
+				for (int traj_idx = 0; traj_idx < iter; traj_idx++) {
+					// Vérifier que les valeurs sont valides
+					if (isnan(trajX[traj_idx]) || isnan(trajY[traj_idx]) ||
+					    isinf(trajX[traj_idx]) || isinf(trajY[traj_idx])) {
+						continue;  // Ignorer les valeurs invalides
+					}
 
+					// Convertir coordonnées complexes en pixels (optimisé)
+					double px_d = (trajX[traj_idx] - xmin) * inv_xrange * xpixel;
+					double py_d = (trajY[traj_idx] - ymin) * inv_yrange * ypixel;
+					
+					// Vérifier les limites avant conversion
+					if (px_d < 0.0 || px_d >= (double)xpixel || 
+					    py_d < 0.0 || py_d >= (double)ypixel) {
+						continue;  // Ignorer les pixels hors limites
+					}
+
+					int px = (int)px_d;
+					int py = (int)py_d;
+
+					// Double vérification des limites (protection supplémentaire)
 					if (px >= 0 && px < xpixel && py >= 0 && py < ypixel) {
-						f->fmatrix[py * xpixel + px]++;
+						int idx = py * xpixel + px;
+						if (idx >= 0 && idx < xpixel * ypixel) {
+							f->fmatrix[idx]++;
+						}
 					}
 				}
 			}
 		}
 		
 		// Après chaque chunk : normaliser, coloriser et afficher progressivement
-		maxDensity = 1;
-		for (i = 0; i < xpixel * ypixel; i++) {
-			if (f->fmatrix[i] > maxDensity) {
-				maxDensity = f->fmatrix[i];
-			}
-		}
-		
-		if (maxDensity > 0) {
-			double logMaxDensity = log(1 + maxDensity);
-			const gradient_table* gradient = Colorization_GetPalette(f->colorMode);
-			for (j = 0; j < ypixel; j++) {
-				for (i = 0; i < xpixel; i++) {
-					double density = (double)f->fmatrix[j * xpixel + i];
-					double normalized = log(1 + density) / logMaxDensity;
-
-					colorization_color cc = Gradient_Interpolate(gradient, normalized);
-					/* Update cmatrix for consistency */
-					f->cmatrix[j * xpixel + i].r = cc.r;
-					f->cmatrix[j * xpixel + i].g = cc.g;
-					f->cmatrix[j * xpixel + i].b = cc.b;
-					f->cmatrix[j * xpixel + i].a = 255;
-					pixelRGBA(canvas, (Sint16)(i + decalageX), (Sint16)(j + decalageY),
-					          cc.r, cc.g, cc.b, 255);
+		// Ne rendre que tous les N chunks pour améliorer les performances
+		if (chunk % 2 == 0 || chunk == num_chunks - 1) {  // Rendre tous les 2 chunks + le dernier
+			maxDensity = 1;
+			for (i = 0; i < xpixel * ypixel; i++) {
+				if (f->fmatrix[i] > maxDensity) {
+					maxDensity = f->fmatrix[i];
 				}
-				if (j % 10 == 0 || j == ypixel - 1) {
-					SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
+			}
+			
+			if (maxDensity > 0) {
+				double logMaxDensity = log(1.0 + (double)maxDensity);
+				// Protection contre division par zéro ou logMaxDensity invalide
+				if (logMaxDensity > 0.0 && !isnan(logMaxDensity) && !isinf(logMaxDensity)) {
+					const gradient_table* gradient = Colorization_GetPalette(f->colorMode);
+					if (gradient != NULL) {
+						// Précalculer 1/logMaxDensity pour éviter les divisions répétées
+						double inv_logMaxDensity = 1.0 / logMaxDensity;
+						
+						for (j = 0; j < ypixel; j++) {
+							for (i = 0; i < xpixel; i++) {
+								int idx = j * xpixel + i;
+								if (idx >= 0 && idx < xpixel * ypixel) {
+									double density = (double)f->fmatrix[idx];
+									double normalized = log(1.0 + density) * inv_logMaxDensity;
+									
+									// Clamper la valeur normalisée entre 0 et 1
+									if (normalized < 0.0) normalized = 0.0;
+									else if (normalized > 1.0) normalized = 1.0;
+									if (isnan(normalized) || isinf(normalized)) normalized = 0.0;
+
+									colorization_color cc = Gradient_Interpolate(gradient, normalized);
+									/* Update cmatrix for consistency */
+									f->cmatrix[idx].r = cc.r;
+									f->cmatrix[idx].g = cc.g;
+									f->cmatrix[idx].b = cc.b;
+									f->cmatrix[idx].a = 255;
+									pixelRGBA(canvas, (Sint16)(i + decalageX), (Sint16)(j + decalageY),
+									          cc.r, cc.g, cc.b, 255);
+								}
+							}
+							// Mise à jour partielle tous les 20 lignes (au lieu de 10)
+							if (j % 20 == 0 || j == ypixel - 1) {
+								SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
+							}
+						}
+					}
 				}
 			}
 		}
