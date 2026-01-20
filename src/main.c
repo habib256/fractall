@@ -184,7 +184,7 @@ main (int argc, char *argv[])
 	
 	// On initialise le menu si useGui = TRUE
 	if (useGui)
-		g = SDLGUI_Init (0, 0, win.w, win.y1, stateH, SDL_MapRGB (screen->format, 213, 214, 213), 17);	// 17 boutons (types 1-17)
+		g = SDLGUI_Init (0, 0, win.w, win.y1, stateH, SDL_MapRGB (screen->format, 213, 214, 213), 20);	// 20 boutons (types 1-20)
 	if (useGui)
 		SDLGUI_Draw (screen, &g);
 	

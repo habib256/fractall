@@ -1759,6 +1759,15 @@ void Fractal_ChangeType (fractal* f, int type) {
 	case 17:
 	Lyapunov_def (f);
 	break;
+	case 18:
+	PerpendicularBurningShip_def (f);
+	break;
+	case 19:
+	Celtic_def (f);
+	break;
+	case 20:
+	AlphaMandelbrot_def (f);
+	break;
 	default:
 	Mendelbrot_def (f);
 	}
@@ -1837,10 +1846,13 @@ const char* Fractal_GetTypeName(int type) {
 		"Tricorn",    // 14
 		"Mandelbulb", // 15
 		"Buddhabrot", // 16
-		"Lyapunov Zircon City"   // 17
+		"Lyapunov Zircon City",   // 17
+		"Perpendicular Burning Ship", // 18
+		"Celtic",     // 19
+		"Alpha Mandelbrot"  // 20
 	};
 
-	if (type >= 0 && type <= 17) {
+	if (type >= 0 && type <= 20) {
 		return typeNames[type];
 	}
 	return "Unknown";
@@ -2303,6 +2315,134 @@ void Mandelbulb_def (fractal* f) {
 	f->seed = ZeroSetofComplex();
 	f->bailout= 4;
 	f->iterationMax= 9370;
+	f->zoomfactor = 8;
+}
+
+/* Calcul de Perpendicular Burning Ship
+ * Formule: z(n+1) = (Re(z) - i·|Im(z)|)² + c
+ * En termes de parties réelle et imaginaire:
+ * x_{n+1} = x_n² - |y_n|² + c_x
+ * y_{n+1} = -2·x_n·|y_n| + c_y
+ */
+fractalresult PerpendicularBurningShip_Iteration (fractal f, complex zPixel) {
+	int i=0;
+	complex z;
+	fractalresult result;
+	
+	z = f.seed;
+	do {
+		double x, y, y_abs;
+		double x2, y2;
+		i++;
+		// z(n+1) = (Re(z) - i·|Im(z)|)² + c
+		x = Rez(z);
+		y = Imz(z);
+		y_abs = fabs(y);
+		
+		// Calcul de (x - i·y_abs)² = x² - y_abs² - i·2·x·y_abs
+		x2 = x * x;
+		y2 = y_abs * y_abs;
+		z = MakeComplex(x2 - y2 + Rez(zPixel), -2.0 * x * y_abs + Imz(zPixel));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
+	
+	result.iteration = i;
+	result.z = z;
+	return result;
+}
+void PerpendicularBurningShip_def (fractal* f) {
+	/* Valeurs de base pour Perpendicular Burning Ship */
+	f->xmin = -2.5;
+	f->xmax = 1.5;
+	f->ymin = -1.5;
+	f->ymax = 1.5;
+	f->seed = ZeroSetofComplex();
+	f->bailout= 4;
+	f->iterationMax= 5000;
+	f->zoomfactor = 8;
+}
+
+/* Calcul de Celtic Fractal
+ * Formule: z(n+1) = |Re(z²)| + i·Im(z²) + c
+ * En termes de parties réelle et imaginaire:
+ * u = x² - y²        // partie réelle de z²
+ * v = 2·x·y          // partie imaginaire de z²
+ * x_{n+1} = |u| + c_x
+ * y_{n+1} = v + c_y
+ */
+fractalresult Celtic_Iteration (fractal f, complex zPixel) {
+	int i=0;
+	complex z;
+	fractalresult result;
+	
+	z = f.seed;
+	do {
+		double x, y;
+		double u, v;  // u = partie réelle de z², v = partie imaginaire de z²
+		i++;
+		// Calcul de z² = (x + iy)² = (x² - y²) + i(2xy)
+		x = Rez(z);
+		y = Imz(z);
+		u = x * x - y * y;  // partie réelle de z²
+		v = 2.0 * x * y;    // partie imaginaire de z²
+		
+		// Application de abs() à la partie réelle
+		z = MakeComplex(fabs(u) + Rez(zPixel), v + Imz(zPixel));
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
+	
+	result.iteration = i;
+	result.z = z;
+	return result;
+}
+void Celtic_def (fractal* f) {
+	/* Valeurs de base pour Celtic Fractal */
+	f->xmin = -2.0;
+	f->xmax = 1.0;
+	f->ymin = -1.5;
+	f->ymax = 1.5;
+	f->seed = ZeroSetofComplex();
+	f->bailout= 4;
+	f->iterationMax= 5000;
+	f->zoomfactor = 8;
+}
+
+/* Calcul de Alpha Mandelbrot (Nested/Composite)
+ * Formule: z(n+1) = z² + (z² + c)² + c
+ * En termes de parties réelle et imaginaire:
+ * m = z² + c
+ * z_{n+1} = z² + m² + c
+ */
+fractalresult AlphaMandelbrot_Iteration (fractal f, complex zPixel) {
+	int i=0;
+	complex z;
+	fractalresult result;
+	
+	z = f.seed;
+	do {
+		complex zSq, m, mSq;
+		i++;
+		// Calcul de z²
+		zSq = Mulz(z, z);
+		// Calcul de m = z² + c
+		m = Addz(zSq, zPixel);
+		// Calcul de m²
+		mSq = Mulz(m, m);
+		// z_{n+1} = z² + m² + c
+		z = Addz(Addz(zSq, mSq), zPixel);
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
+	
+	result.iteration = i;
+	result.z = z;
+	return result;
+}
+void AlphaMandelbrot_def (fractal* f) {
+	/* Valeurs de base pour Alpha Mandelbrot */
+	f->xmin = -2.5;
+	f->xmax = 1.5;
+	f->ymin = -1.5;
+	f->ymax = 1.5;
+	f->seed = ZeroSetofComplex();
+	f->bailout= 4;
+	f->iterationMax= 2000;  // Divergence plus rapide, moins d'itérations nécessaires
 	f->zoomfactor = 8;
 }
 
@@ -3522,6 +3662,15 @@ fractalresult FormulaSelector (fractal f, complex zPixel) {
 	break;
 	case 15:
 	r=Mandelbulb_Iteration (f,zPixel);
+	break;
+	case 18:
+	r=PerpendicularBurningShip_Iteration (f,zPixel);
+	break;
+	case 19:
+	r=Celtic_Iteration (f,zPixel);
+	break;
+	case 20:
+	r=AlphaMandelbrot_Iteration (f,zPixel);
 	break;
 
 	}

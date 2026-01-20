@@ -62,7 +62,7 @@ fractall [OPTIONS]
 | **F10** | Tricorn |
 | **F11** | Mandelbulb |
 | **F12** | Buddhabrot |
-| **GUI** | 17 boutons pour sélectionner toutes les fractales (types 1-17) |
+| **GUI** | 20 boutons pour sélectionner toutes les fractales (types 1-20) |
 | **Clic gauche** | Zoom / +1 itération (vectorielles) |
 | **Clic droit** | Dézoom / -1 itération |
 | **C** | Changer palette |
@@ -70,7 +70,7 @@ fractall [OPTIONS]
 | **S** | Screenshot (Screenshot.bmp) |
 | **Q/ESC** | Quitter |
 
-**Note** : Les types 9-12 (Barnsley, Magnet) et 17 (Lyapunov) sont accessibles uniquement via les boutons GUI.
+**Note** : Les types 9-12 (Barnsley, Magnet), 17 (Lyapunov) et 18-20 (Perpendicular Burning Ship, Celtic, Alpha Mandelbrot) sont accessibles uniquement via les boutons GUI.
 
 ## Architecture
 
@@ -98,7 +98,7 @@ src/
 | 1 | Von Koch | 8 |
 | 2 | Dragon | 20 |
 
-### Escape-time - Types 3-17
+### Escape-time - Types 3-20
 
 | Type | Nom | Formule |
 |------|-----|---------|
@@ -117,6 +117,9 @@ src/
 | 15 | Mandelbulb | z(n+1) = z(n)⁸ + c |
 | 16 | Buddhabrot | Densité des trajectoires d'échappement |
 | 17 | Lyapunov Zircon City | Exposant de Lyapunov (séquence "BBBBBBAAAAAA", domaine [2.5, 3.4] × [3.4, 4.0]) |
+| 18 | Perpendicular Burning Ship | z(n+1) = (Re(z) - i×\|Im(z)\|)² + c |
+| 19 | Celtic | z(n+1) = \|Re(z²)\| + i×Im(z²) + c |
+| 20 | Alpha Mandelbrot | z(n+1) = z² + (z² + c)² + c |
 
 ### Buffalo (Type 8)
 
@@ -264,16 +267,16 @@ Un plan de recherche détaillé est disponible dans **PLAN_RECHERCHE_FRACTALES.m
 
 ### Catégories identifiées
 
-#### Priorité HAUTE (faciles à implémenter)
-1. **Perpendicular Burning Ship** - Variante du Burning Ship avec pliage perpendiculaire
+#### Priorité HAUTE (faciles à implémenter) ✅ COMPLÉTÉ
+1. **Perpendicular Burning Ship** (Type 18) ✅ - Variante du Burning Ship avec pliage perpendiculaire
    - Formule : `z(n+1) = (Re(z) - i×|Im(z)|)² + c`
    - Complexité : ⭐ Faible (similaire au type 13)
 
-2. **Celtic Fractal** - Formes celtiques entrelacées
-   - Formule : `z(n+1) = |Re(z²)| + i×|Im(z²)| + c`
+2. **Celtic Fractal** (Type 19) ✅ - Formes celtiques entrelacées
+   - Formule : `z(n+1) = |Re(z²)| + i×Im(z²) + c`
    - Complexité : ⭐ Faible
 
-3. **Alpha Mandelbrot** - Structures superposées
+3. **Alpha Mandelbrot** (Type 20) ✅ - Structures superposées
    - Formule : `z(n+1) = z² + (z² + c)² + c`
    - Complexité : ⭐ Faible
 
@@ -306,11 +309,11 @@ Voir **PLAN_RECHERCHE_FRACTALES.md** pour le plan détaillé de recherche et d'i
 ## Notes
 
 - GUI : 51px en haut, barre d'état : 20px en bas
-- 17 boutons dans le GUI (types 1-17)
+- 20 boutons dans le GUI (types 1-20)
 - `Buddhabrot_Draw()` pour le type 16 (algorithme de densité)
 - `Lyapunov_Draw()` pour le type 17 (algorithme d'exposant de Lyapunov - Zircon City)
 - `Fractal_Draw()` détecte automatiquement les types 16-17 et appelle leurs fonctions spécialisées
-- `Fractal_GetTypeName()` retourne le nom selon le type (0-17)
+- `Fractal_GetTypeName()` retourne le nom selon le type (0-20)
 - OpenMP : `HAVE_OPENMP` défini dans `config.h` si disponible
 - SIMD : `HAVE_SSE4_1`, `HAVE_AVX`, `HAVE_AVX2` définis selon le support CPU
 
