@@ -22,28 +22,36 @@ Copyleft 2001-2003 VERHILLE Arnaud
 // Retourne 1 si l'utilisateur veut annuler (ESC, Q, ou fermeture fenêtre), 0 sinon
 // Ne traite que les événements clavier et quit pour éviter d'interférer avec la souris
 static int check_events_and_cancel(void) {
-    SDL_Event events[16];
+    SDL_Event events[32];
     int num_events, i;
     int should_cancel = 0;
 
+    // Pomper les événements pour s'assurer qu'ils sont disponibles
     SDL_PumpEvents();
 
-    // Vérifier les événements QUIT (sans les retirer)
-    num_events = SDL_PeepEvents(events, 16, SDL_PEEKEVENT, SDL_QUITMASK);
-    if (num_events > 0) {
-        return 1;  // Demande de fermeture détectée
-    }
-
-    // Vérifier les événements clavier SANS les retirer (SDL_PEEKEVENT)
-    // Cela permet de détecter ESC même si on vérifie plusieurs fois
-    // La boucle principale consommera l'événement quand elle le traitera
-    num_events = SDL_PeepEvents(events, 16, SDL_PEEKEVENT, SDL_KEYDOWNMASK);
-    for (i = 0; i < num_events; i++) {
-        if (events[i].key.keysym.sym == SDLK_ESCAPE ||
-            events[i].key.keysym.sym == SDLK_q) {
+    // Récupérer TOUS les événements QUIT et clavier, consommer ceux qu'on veut
+    // Utiliser SDL_GETEVENT pour consommer les événements immédiatement
+    int num_all = SDL_PeepEvents(events, 32, SDL_GETEVENT, SDL_QUITMASK | SDL_KEYDOWNMASK);
+    
+    // Parcourir tous les événements
+    for (i = 0; i < num_all; i++) {
+        if (events[i].type == SDL_QUIT) {
             should_cancel = 1;
-            break;  // Un seul ESC suffit
+            // Ne pas remettre l'événement QUIT - il est consommé
+            continue;
         }
+        
+        if (events[i].type == SDL_KEYDOWN) {
+            if (events[i].key.keysym.sym == SDLK_ESCAPE ||
+                events[i].key.keysym.sym == SDLK_q) {
+                should_cancel = 1;
+                // Ne pas remettre ESC/Q - ils sont consommés
+                continue;
+            }
+        }
+        
+        // Remettre les autres événements pour traitement ultérieur
+        SDL_PushEvent(&events[i]);
     }
 
     return should_cancel;
@@ -2904,10 +2912,47 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 	int ypixel = f->ypixel;
 	int iterMax = f->iterationMax;
 	int bailout = f->bailout;
-	double xmin = f->xmin;
-	double ymin = f->ymin;
-	double xrange = f->xmax - f->xmin;
-	double yrange = f->ymax - f->ymin;
+	
+	// Convertir les coordonnées depuis GMP si nécessaire
+	double xmin, ymin, xmax, ymax;
+#ifdef HAVE_GMP
+	if (f->use_gmp) {
+		// Initialiser les structures GMP si nécessaire
+		// mpf_init2 peut être appelé plusieurs fois sans problème
+		mp_bitcnt_t prec = f->gmp_precision > 0 ? f->gmp_precision : 64;
+		mpf_init2(f->xmin_gmp, prec);
+		mpf_init2(f->xmax_gmp, prec);
+		mpf_init2(f->ymin_gmp, prec);
+		mpf_init2(f->ymax_gmp, prec);
+		
+		// Synchroniser les valeurs double → GMP si nécessaire
+		// (au cas où les valeurs double ont été modifiées)
+		mpf_set_d(f->xmin_gmp, f->xmin);
+		mpf_set_d(f->xmax_gmp, f->xmax);
+		mpf_set_d(f->ymin_gmp, f->ymin);
+		mpf_set_d(f->ymax_gmp, f->ymax);
+		
+		// Convertir depuis GMP vers double pour Buddhabrot
+		// (Buddhabrot utilise double pour les calculs, pas GMP)
+		xmin = mpf_get_d(f->xmin_gmp);
+		ymin = mpf_get_d(f->ymin_gmp);
+		xmax = mpf_get_d(f->xmax_gmp);
+		ymax = mpf_get_d(f->ymax_gmp);
+	} else {
+		xmin = f->xmin;
+		ymin = f->ymin;
+		xmax = f->xmax;
+		ymax = f->ymax;
+	}
+#else
+	xmin = f->xmin;
+	ymin = f->ymin;
+	xmax = f->xmax;
+	ymax = f->ymax;
+#endif
+	
+	double xrange = xmax - xmin;
+	double yrange = ymax - ymin;
 
 	// Vérifications de sécurité
 	if (f == NULL || f->fmatrix == NULL || f->cmatrix == NULL) {
@@ -2963,12 +3008,12 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 	if (numSamples > 50000000) numSamples = 50000000;  // Limite raisonnable (~50M)
 
 	// Taille des chunks pour rendu incrémental (affichage progressif)
-	// Chunks plus grands pour réduire la fréquence de rendu (améliore les performances)
-	int chunk_size = 5000;  // Augmenté de 500 à 5000 pour moins de rendus
-	if (chunk_size > numSamples / 5) {
-		chunk_size = numSamples / 5;  // Maximum 5 chunks pour le rendu progressif
+	// Chunks plus petits pour meilleure réactivité à l'annulation
+	int chunk_size = 1000;  // Réduit pour permettre une vérification plus fréquente
+	if (chunk_size > numSamples / 10) {
+		chunk_size = numSamples / 10;  // Maximum 10 chunks pour le rendu progressif
 	}
-	if (chunk_size < 1000) chunk_size = 1000;  // Minimum 1000 échantillons par chunk
+	if (chunk_size < 500) chunk_size = 500;  // Minimum 500 échantillons par chunk (réduit pour réactivité)
 	int num_chunks = (numSamples + chunk_size - 1) / chunk_size;
 
 	// Mise à jour initiale de la progression
@@ -2980,10 +3025,12 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 #ifdef HAVE_OPENMP
 	// Variable de cancellation partagée pour arrêt rapide
 	volatile int cancelled = 0;
+	// Compteur partagé pour la répartition du travail (déclaré avant la région parallèle)
+	int sample_counter_shared = 0;
 	
 	// Créer la région parallèle UNE SEULE FOIS avant la boucle des chunks
 	// Cela évite la surcharge de création/destruction répétée des threads
-	#pragma omp parallel
+	#pragma omp parallel shared(sample_counter_shared)
 	{
 		// Variables thread-local pour génération aléatoire thread-safe
 		// Initialiser la seed une seule fois par thread (basée sur thread_id uniquement)
@@ -3006,16 +3053,19 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 			#pragma omp master
 			{
 				if (check_events_and_cancel()) {
-					printf("Calcul Buddhabrot annulé par l'utilisateur\n");
+					printf("Calcul Buddhabrot annulé par l'utilisateur (chunk %d)\n", chunk);
 					cancelled = 1;
 				}
 			}
 			
-			// Synchroniser tous les threads avant de continuer
-			#pragma omp barrier
+			// Synchroniser cancelled immédiatement après la vérification
+			#pragma omp flush(cancelled)
 			
-			// Si annulé, sortir de la boucle des chunks
+			// Si annulé, sortir de la boucle des chunks IMMÉDIATEMENT
 			if (cancelled) break;
+			
+			// Synchroniser tous les threads avant de continuer (seulement si pas annulé)
+			#pragma omp barrier
 			
 			int chunk_start = chunk * chunk_size;
 			int chunk_end = (chunk_start + chunk_size < numSamples) ? chunk_start + chunk_size : numSamples;
@@ -3023,27 +3073,70 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 			// Vérifier l'annulation avant de commencer le traitement parallèle
 			// (vérification déjà faite avant la barrière, mais on s'assure que cancelled est à jour)
 			#pragma omp flush(cancelled)
+			if (cancelled) break;  // Sortie immédiate si annulé
 			
 			// Traitement parallèle des échantillons dans ce chunk
+			// Utiliser un compteur atomique partagé pour permettre une sortie immédiate
 			if (trajX != NULL && trajY != NULL && !cancelled) {
-				#pragma omp for schedule(dynamic, 100)
-				for (int sample = chunk_start; sample < chunk_end; sample++) {
-					// Vérifier cancelled très fréquemment (tous les 10 échantillons) pour meilleure réactivité
-					if (sample % 10 == 0) {
-						// Un seul thread vérifie les événements pour éviter les appels multiples
-						#pragma omp critical(check_cancel)
-						{
-							if (!cancelled && check_events_and_cancel()) {
-								cancelled = 1;
-								printf("Calcul Buddhabrot annulé par l'utilisateur (détecté dans chunk %d)\n", chunk);
-							}
-						}
-						// Synchroniser cancelled entre tous les threads
-						#pragma omp flush(cancelled)
+				// Initialiser le compteur partagé pour ce chunk
+				#pragma omp master
+				{
+					sample_counter_shared = chunk_start;
+				}
+				#pragma omp barrier  // Attendre que le master initialise
+				
+				// Boucle while avec répartition manuelle du travail (permet sortie immédiate)
+				// Pas de barrière ici - chaque thread commence immédiatement
+				while (1) {
+					// Vérifier cancelled AVANT de prendre un échantillon (à chaque itération)
+					#pragma omp flush(cancelled)
+					if (cancelled) {
+						break;  // Sortie immédiate possible avec while
 					}
 					
-					// Vérifier cancelled avant chaque itération pour réponse rapide
-					if (cancelled) continue;
+					// Prendre un échantillon de manière atomique
+					int sample = -1;
+					#pragma omp critical(get_sample)
+					{
+						if (sample_counter_shared < chunk_end) {
+							sample = sample_counter_shared;
+							sample_counter_shared++;
+						}
+					}
+					
+					// Si on a atteint la fin, sortir
+					if (sample < 0 || sample >= chunk_end) {
+						break;
+					}
+					
+					// Vérifier cancelled après avoir pris l'échantillon
+					#pragma omp flush(cancelled)
+					if (cancelled) {
+						break;
+					}
+					
+					// Vérifier les événements TRÈS fréquemment (tous les échantillons pour les premiers, puis tous les 3)
+					// pour détection maximale - vérifier à chaque itération pour les 10 premiers échantillons
+					if (sample < chunk_start + 10 || sample % 3 == 0) {
+						#pragma omp critical(check_cancel)
+						{
+							// Toujours vérifier les événements
+							if (check_events_and_cancel()) {
+								cancelled = 1;
+								printf("Calcul Buddhabrot annulé par l'utilisateur (chunk %d, sample %d)\n", chunk, sample);
+							}
+						}
+						#pragma omp flush(cancelled)
+						if (cancelled) {
+							break;
+						}
+					}
+					
+					// Vérifier cancelled une dernière fois avant de commencer le calcul
+					#pragma omp flush(cancelled)
+					if (cancelled) {
+						break;
+					}
 					
 					// Générer un point c aléatoire (thread-safe)
 					// Utiliser une fonction de hash simple (LCG) avec seed thread-local
@@ -3065,11 +3158,19 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 					int early_exit_threshold = (iterMax < 50) ? iterMax / 2 : 50;
 					
 					for (iter = 0; iter < iterMax; iter++) {
-						// Vérifier cancelled périodiquement dans la boucle d'itération (tous les 50 itérations)
-						// pour permettre l'annulation même pendant les calculs longs
-						if (iter % 50 == 0) {
+						// Vérifier cancelled TRÈS fréquemment dans la boucle d'itération (tous les 3 itérations)
+						// pour permettre l'annulation même pendant les calculs très longs
+						if (iter % 3 == 0) {
+							// Flush cancelled pour s'assurer qu'on voit la valeur à jour
 							#pragma omp flush(cancelled)
-							if (cancelled) break;
+							if (cancelled) {
+								break;
+							}
+						}
+						
+						// Vérifier cancelled aussi avant les opérations coûteuses
+						if (cancelled) {
+							break;
 						}
 						
 						complex zTemp = Mulz(z, z);
@@ -3102,6 +3203,12 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 
 					// Si le point s'échappe, tracer sa trajectoire
 					if (escaped && iter > 0) {
+						// Précalculer les constantes pour éviter les divisions répétées
+						double inv_xrange = 1.0 / xrange;
+						double inv_yrange = 1.0 / yrange;
+						double scale_x = xpixel * inv_xrange;
+						double scale_y = ypixel * inv_yrange;
+						
 						for (int traj_idx = 0; traj_idx < iter; traj_idx++) {
 							// Vérifier que les valeurs sont valides
 							if (isnan(trajX[traj_idx]) || isnan(trajY[traj_idx]) ||
@@ -3109,9 +3216,9 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 								continue;  // Ignorer les valeurs invalides
 							}
 
-							// Convertir coordonnées complexes en pixels
-							double px_d = (trajX[traj_idx] - xmin) / xrange * xpixel;
-							double py_d = (trajY[traj_idx] - ymin) / yrange * ypixel;
+							// Convertir coordonnées complexes en pixels (optimisé avec précalculs)
+							double px_d = (trajX[traj_idx] - xmin) * scale_x;
+							double py_d = (trajY[traj_idx] - ymin) * scale_y;
 							
 							// Vérifier les limites avant conversion
 							if (px_d < 0.0 || px_d >= (double)xpixel || 
@@ -3132,11 +3239,14 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 							}
 						}
 					}
-				}
+				}  // Fin de la boucle while pour les échantillons
 			}
 			
 			// Synchroniser tous les threads avant le rendu progressif
 			#pragma omp barrier
+			
+			// Vérifier cancelled après la barrière (tous les threads synchronisés)
+			if (cancelled) break;
 			
 			// Rendu progressif par un seul thread (évite les conflits)
 			#pragma omp master
