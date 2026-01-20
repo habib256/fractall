@@ -28,6 +28,7 @@
 #include "SDL_gfxPrimitives.h"
 #include "VonKoch.h"
 #include "colorization.h"
+#include "png_save.h"
 #ifdef HAVE_GMP
 #include <gmp.h>
 #include "precision_detector.h"
@@ -252,6 +253,13 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				int* typeFractale, int* iteration, window win, Uint32* renderTime)
 {
 	double centerX, centerY;
+	
+	// Variables statiques pour la sélection de zone
+	static int selecting = 0;
+	static int selectStartX = 0, selectStartY = 0;
+	static int selectCurrentX = 0, selectCurrentY = 0;
+	static SDL_Surface* savedFractalArea = NULL; // Sauvegarde de la zone fractale pour redessiner le rectangle
+	
 	switch (event->type)
     {
 		
@@ -272,14 +280,23 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				exit (0);
 			}
 			if (event->key.keysym.sym == SDLK_s)
-			{			// Screenshot
-				if (SDL_SaveBMP (screen, "Screenshot.bmp") != 0)
+			{			// Screenshot en PNG avec métadonnées
+				if (SavePNGWithMetadata(screen, "Screenshot.png", f, *typeFractale) != 0)
 				{
-					printf ("Cannot save the screenshot in BMP file\n");
+					printf ("Cannot save the screenshot in PNG file\n");
+					// Fallback vers BMP si PNG échoue
+					if (SDL_SaveBMP (screen, "Screenshot.bmp") != 0)
+					{
+						printf ("Cannot save the screenshot in BMP file either\n");
+					}
+					else
+					{
+						printf ("Screenshot.bmp file saved successfully (PNG failed)\n");
+					}
 				}
 				else
 				{
-					printf ("Screenshot.bmp file saved successfully\n");
+					printf ("Screenshot.png file saved successfully with metadata\n");
 				}
 			}
 			if (event->key.keysym.sym == SDLK_c)
@@ -583,6 +600,33 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				return 0;
 			}
 			
+			// Gestion de la sélection de zone pour zoom (uniquement pour les fractales escape-time)
+			if (*typeFractale >= 3 && event->button.button == SDL_BUTTON_LEFT) {
+				// Vérifier que le clic est dans la zone de la fractale
+				if (event->button.x >= 0 && event->button.x < f->xpixel &&
+				    event->button.y >= win.y1 && event->button.y < win.y2) {
+					// Commencer la sélection
+					selecting = 1;
+					selectStartX = event->button.x;
+					selectStartY = event->button.y;
+					selectCurrentX = event->button.x;
+					selectCurrentY = event->button.y;
+					
+					// Sauvegarder la zone fractale actuelle pour pouvoir redessiner le rectangle
+					if (savedFractalArea != NULL) {
+						SDL_FreeSurface(savedFractalArea);
+					}
+					savedFractalArea = SDL_CreateRGBSurface(SDL_SWSURFACE, f->xpixel, f->ypixel, 
+						screen->format->BitsPerPixel, screen->format->Rmask, screen->format->Gmask, 
+						screen->format->Bmask, screen->format->Amask);
+					if (savedFractalArea != NULL) {
+						SDL_Rect srcRect = {0, win.y1, f->xpixel, f->ypixel};
+						SDL_Rect dstRect = {0, 0, f->xpixel, f->ypixel};
+						SDL_BlitSurface(screen, &srcRect, savedFractalArea, &dstRect);
+					}
+					return 0; // Ne pas continuer avec le zoom simple
+				}
+			}
 			
 			//printf("typeFractale = %d \n",*typeFractale);
 			switch (*typeFractale)	// Comportement pour quel type de fractale ?
@@ -629,6 +673,11 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			break;
 			default:
 						{			// EscapeTime Fractal Zoom routine
+					
+					// Ne pas zoomer si on est en train de sélectionner une zone
+					if (selecting) {
+						return 0;
+					}
 					
 					if (event->button.button == SDL_BUTTON_LEFT)
 					{		// ZOOM
@@ -1159,6 +1208,157 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			}
 		}
 
+		
+		// Gestion du mouvement de la souris pour la sélection de zone
+		case SDL_MOUSEMOTION:
+		{
+			if (selecting && *typeFractale >= 3) {
+				// Mettre à jour la position actuelle
+				selectCurrentX = event->motion.x;
+				selectCurrentY = event->motion.y;
+				
+				// Limiter aux bornes de la zone fractale
+				if (selectCurrentX < 0) selectCurrentX = 0;
+				if (selectCurrentX >= f->xpixel) selectCurrentX = f->xpixel - 1;
+				if (selectCurrentY < win.y1) selectCurrentY = win.y1;
+				if (selectCurrentY >= win.y2) selectCurrentY = win.y2 - 1;
+				
+				// Restaurer la zone fractale sauvegardée
+				if (savedFractalArea != NULL) {
+					SDL_Rect srcRect = {0, 0, f->xpixel, f->ypixel};
+					SDL_Rect dstRect = {0, win.y1, f->xpixel, f->ypixel};
+					SDL_BlitSurface(savedFractalArea, &srcRect, screen, &dstRect);
+				}
+				
+				// Dessiner le rectangle de sélection
+				int x1 = selectStartX < selectCurrentX ? selectStartX : selectCurrentX;
+				int x2 = selectStartX < selectCurrentX ? selectCurrentX : selectStartX;
+				int y1 = selectStartY < selectCurrentY ? selectStartY : selectCurrentY;
+				int y2 = selectStartY < selectCurrentY ? selectCurrentY : selectStartY;
+				
+				// Dessiner le rectangle avec une bordure
+				rectangleRGBA(screen, x1, y1, x2, y2, 255, 255, 0, 255);
+				rectangleRGBA(screen, x1+1, y1+1, x2-1, y2-1, 255, 255, 0, 255);
+				
+				SDL_UpdateRect(screen, 0, win.y1, f->xpixel, f->ypixel);
+			}
+		}
+		break;
+		
+		// Gestion du relâchement du bouton pour terminer la sélection
+		case SDL_MOUSEBUTTONUP:
+		{
+			if (selecting && event->button.button == SDL_BUTTON_LEFT && *typeFractale >= 3) {
+				selecting = 0;
+				
+				// Calculer les coordonnées du rectangle
+				int x1 = selectStartX < selectCurrentX ? selectStartX : selectCurrentX;
+				int x2 = selectStartX < selectCurrentX ? selectCurrentX : selectStartX;
+				int y1 = selectStartY < selectCurrentY ? selectStartY : selectCurrentY;
+				int y2 = selectStartY < selectCurrentY ? selectCurrentY : selectStartY;
+				
+				// Vérifier que le rectangle a une taille minimale
+				int width = x2 - x1;
+				int height = y2 - y1;
+				
+				if (width > 5 && height > 5 && 
+				    x1 >= 0 && x2 < f->xpixel &&
+				    y1 >= win.y1 && y2 < win.y2) {
+					
+					// Convertir les coordonnées pixels en coordonnées complexes
+					double xmin_old = f->xmin;
+					double xmax_old = f->xmax;
+					double ymin_old = f->ymin;
+					double ymax_old = f->ymax;
+					
+					// Calculer le rapport d'aspect dans l'espace complexe (doit rester constant)
+					double rangeX_old = xmax_old - xmin_old;
+					double rangeY_old = ymax_old - ymin_old;
+					double complexAspectRatio = rangeX_old / rangeY_old; // Rapport d'aspect dans l'espace complexe
+					
+					// Calculer les coordonnées complexes du centre du rectangle sélectionné
+					double pixelToX = rangeX_old / f->xpixel;
+					double pixelToY = rangeY_old / f->ypixel;
+					
+					double centerX_complex = xmin_old + ((x1 + x2) / 2.0) * pixelToX;
+					double centerY_complex = ymin_old + ((y1 + y2) / 2.0 - win.y1) * pixelToY;
+					
+					// Calculer la taille du rectangle sélectionné dans l'espace complexe
+					double selectedRangeX = width * pixelToX;
+					double selectedRangeY = height * pixelToY;
+					double selectedAspectRatio = selectedRangeX / selectedRangeY;
+					
+					// Ajuster pour préserver le rapport d'aspect dans l'espace complexe
+					double newRangeX, newRangeY;
+					if (selectedAspectRatio > complexAspectRatio) {
+						// Le rectangle sélectionné est trop large, ajuster la hauteur
+						newRangeX = selectedRangeX;
+						newRangeY = selectedRangeX / complexAspectRatio;
+					} else {
+						// Le rectangle sélectionné est trop haut, ajuster la largeur
+						newRangeY = selectedRangeY;
+						newRangeX = selectedRangeY * complexAspectRatio;
+					}
+					
+					// Calculer les nouvelles bornes centrées sur le centre du rectangle sélectionné
+					double newXmin = centerX_complex - newRangeX / 2.0;
+					double newXmax = centerX_complex + newRangeX / 2.0;
+					double newYmin = centerY_complex - newRangeY / 2.0;
+					double newYmax = centerY_complex + newRangeY / 2.0;
+					
+					// Appliquer le zoom
+					f->xmin = newXmin;
+					f->xmax = newXmax;
+					f->ymin = newYmin;
+					f->ymax = newYmax;
+#ifdef HAVE_GMP
+					// Toujours vérifier si GMP est nécessaire après un zoom
+					precision_update_fractal(f);
+					precision_update_gmp_structures(f);
+					// Synchroniser les coordonnées GMP
+					if (f->use_gmp) {
+						mpf_set_d(f->xmin_gmp, newXmin);
+						mpf_set_d(f->xmax_gmp, newXmax);
+						mpf_set_d(f->ymin_gmp, newYmin);
+						mpf_set_d(f->ymax_gmp, newYmax);
+					}
+#endif
+					
+					f->cmatrix_valid = 0;
+					
+					// Recalculer la fractale
+					if (*typeFractale == 16) {
+						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+					} else if (is_lyapunov_type(*typeFractale)) {
+						*renderTime = Fractal_Draw (screen, *f, 0, win.y1, g);
+					} else {
+						*renderTime = Fractal_Draw (screen, *f, 0, win.y1, g);
+					}
+					
+					centerX = (f->xmin + f->xmax) / 2;
+					centerY = (f->ymin + f->ymax) / 2;
+					if (g != NULL)
+						SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
+					
+					printf ("Zoom zone: X=[%f, %f] Y=[%f, %f]\n", newXmin, newXmax, newYmin, newYmax);
+				} else {
+					// Rectangle trop petit ou invalide, restaurer l'image
+					if (savedFractalArea != NULL) {
+						SDL_Rect srcRect = {0, 0, f->xpixel, f->ypixel};
+						SDL_Rect dstRect = {0, win.y1, f->xpixel, f->ypixel};
+						SDL_BlitSurface(savedFractalArea, &srcRect, screen, &dstRect);
+						SDL_UpdateRect(screen, 0, win.y1, f->xpixel, f->ypixel);
+					}
+				}
+				
+				// Libérer la surface sauvegardée
+				if (savedFractalArea != NULL) {
+					SDL_FreeSurface(savedFractalArea);
+					savedFractalArea = NULL;
+				}
+			}
+		}
+		break;
 		
 			default:    // Default General du switch de traitement d'evenement
 				{

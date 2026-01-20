@@ -155,6 +155,34 @@ AM_CONDITIONAL([HAVE_SSE4_1], [test "x$have_sse4_1" = "xyes"])
 AM_CONDITIONAL([HAVE_AVX], [test "x$have_avx" = "xyes"])
 AM_CONDITIONAL([HAVE_AVX2], [test "x$have_avx2" = "xyes"])
 
+dnl ***************************************************************************
+dnl Check for libpng (optional, for PNG export with metadata)
+dnl ***************************************************************************
+AC_ARG_WITH([png],
+    [AS_HELP_STRING([--without-png], [Disable PNG export support])],
+    [use_png=$withval],
+    [use_png=yes])
+
+have_png=no
+if test "x$use_png" != "xno"; then
+    AC_CHECK_HEADER([png.h],
+        [AC_CHECK_LIB([png], [png_create_write_struct],
+            [PNG_LIBS="-lpng"
+             AC_DEFINE([HAVE_PNG], [1], [Define if libpng is available])
+             have_png=yes],
+            [have_png=no])],
+        [have_png=no])
+fi
+
+AM_CONDITIONAL([HAVE_PNG], [test "x$have_png" = "xyes"])
+
+if test "x$have_png" = "xyes"; then
+    LIBS="$LIBS $PNG_LIBS"
+    AC_MSG_NOTICE([PNG export support enabled])
+else
+    AC_MSG_NOTICE([PNG export support disabled - BMP fallback will be used])
+fi
+
 
 
 

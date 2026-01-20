@@ -103,6 +103,7 @@ bin_PROGRAMS = fractall$(EXEEXT)
 
 @HAVE_OPENMP_TRUE@am__append_6 = $(OPENMP_CFLAGS)
 @HAVE_OPENMP_TRUE@am__append_7 = $(OPENMP_CFLAGS)
+@HAVE_PNG_TRUE@am__append_8 = $(PNG_LIBS)
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/acinclude.m4 \
@@ -121,9 +122,10 @@ am__fractall_SOURCES_DIST = main.c complexmath.c complexmath.h \
 	EscapeTime.h exception.c exception.h SDL_gfxPrimitives.c \
 	SDL_gfxPrimitives.h SDL_gfxPrimitives_font.h SDLGUI.c SDLGUI.h \
 	SDL_imageFilter.c SDL_imageFilter.h SDL_rotozoom.c \
-	SDL_rotozoom.h VonKoch.c VonKoch.h complexmath_simd.c \
-	complexmath_gmp.c complexmath_gmp.h precision_detector.c \
-	precision_detector.h gmp_pool.c gmp_pool.h
+	SDL_rotozoom.h VonKoch.c VonKoch.h png_save.c png_save.h \
+	complexmath_simd.c complexmath_gmp.c complexmath_gmp.h \
+	precision_detector.c precision_detector.h gmp_pool.c \
+	gmp_pool.h
 @HAVE_SSE4_1_TRUE@am__objects_1 = complexmath_simd.$(OBJEXT)
 @HAVE_GMP_TRUE@am__objects_2 = complexmath_gmp.$(OBJEXT) \
 @HAVE_GMP_TRUE@	precision_detector.$(OBJEXT) gmp_pool.$(OBJEXT)
@@ -131,8 +133,8 @@ am_fractall_OBJECTS = main.$(OBJEXT) complexmath.$(OBJEXT) \
 	colorization.$(OBJEXT) EscapeTime.$(OBJEXT) \
 	exception.$(OBJEXT) SDL_gfxPrimitives.$(OBJEXT) \
 	SDLGUI.$(OBJEXT) SDL_imageFilter.$(OBJEXT) \
-	SDL_rotozoom.$(OBJEXT) VonKoch.$(OBJEXT) $(am__objects_1) \
-	$(am__objects_2)
+	SDL_rotozoom.$(OBJEXT) VonKoch.$(OBJEXT) png_save.$(OBJEXT) \
+	$(am__objects_1) $(am__objects_2)
 fractall_OBJECTS = $(am_fractall_OBJECTS)
 fractall_DEPENDENCIES =
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -164,7 +166,7 @@ am__depfiles_remade = ./$(DEPDIR)/EscapeTime.Po ./$(DEPDIR)/SDLGUI.Po \
 	./$(DEPDIR)/complexmath.Po ./$(DEPDIR)/complexmath_gmp.Po \
 	./$(DEPDIR)/complexmath_simd.Po ./$(DEPDIR)/exception.Po \
 	./$(DEPDIR)/gmp_pool.Po ./$(DEPDIR)/main.Po \
-	./$(DEPDIR)/precision_detector.Po
+	./$(DEPDIR)/png_save.Po ./$(DEPDIR)/precision_detector.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -351,9 +353,9 @@ fractall_SOURCES = main.c complexmath.c complexmath.h color_types.h \
 	exception.c exception.h SDL_gfxPrimitives.c \
 	SDL_gfxPrimitives.h SDL_gfxPrimitives_font.h SDLGUI.c SDLGUI.h \
 	SDL_imageFilter.c SDL_imageFilter.h SDL_rotozoom.c \
-	SDL_rotozoom.h VonKoch.c VonKoch.h $(am__append_1) \
-	$(am__append_5)
-fractall_LDFLAGS = -lm $(am__append_7)
+	SDL_rotozoom.h VonKoch.c VonKoch.h png_save.c png_save.h \
+	$(am__append_1) $(am__append_5)
+fractall_LDFLAGS = -lm $(am__append_7) $(am__append_8)
 fractall_LDADD = \
 	$(IlmBase_LIBS) \
 	$(ILMBASE_LIBS)
@@ -464,6 +466,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exception.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gmp_pool.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/png_save.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/precision_detector.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
@@ -638,6 +641,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/exception.Po
 	-rm -f ./$(DEPDIR)/gmp_pool.Po
 	-rm -f ./$(DEPDIR)/main.Po
+	-rm -f ./$(DEPDIR)/png_save.Po
 	-rm -f ./$(DEPDIR)/precision_detector.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
@@ -697,6 +701,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/exception.Po
 	-rm -f ./$(DEPDIR)/gmp_pool.Po
 	-rm -f ./$(DEPDIR)/main.Po
+	-rm -f ./$(DEPDIR)/png_save.Po
 	-rm -f ./$(DEPDIR)/precision_detector.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic

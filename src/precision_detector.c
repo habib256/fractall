@@ -13,33 +13,33 @@
 #include "precision_detector.h"
 #include "EscapeTime.h"
 
-// Seuil de précision : quand la taille d'un pixel devient inférieure à 1e-14
-// Cela correspond à environ 14 chiffres significatifs, limite pratique des double
-#define PRECISION_THRESHOLD 1e-14
+// Seuil de précision : quand la taille d'un pixel devient inférieure à 1e-15
+// Les double IEEE 754 ont ~15-16 chiffres significatifs, on pousse jusqu'à la limite
+#define PRECISION_THRESHOLD 1e-15
 
-// Précision GMP minimale (64 bits)
+// Précision GMP minimale (53 bits = précision double, arrondi à 64)
 #define GMP_PREC_MIN 64
 
-// Précision GMP maximale (512 bits)
-#define GMP_PREC_MAX 512
+// Précision GMP maximale (256 bits - suffisant pour la plupart des zooms)
+#define GMP_PREC_MAX 256
 
 int precision_needs_gmp(fractal* f) {
     if (f == NULL) return 0;
-    
+
     // Protection contre division par zéro
     if (f->xpixel <= 0 || f->ypixel <= 0) return 0;
-    
+
     double pixel_size_x, pixel_size_y;
-    
+
     // Calcul de la taille d'un pixel en unités complexes
     pixel_size_x = (f->xmax - f->xmin) / f->xpixel;
     pixel_size_y = (f->ymax - f->ymin) / f->ypixel;
-    
+
     // Si la taille d'un pixel est inférieure au seuil, on a besoin de GMP
     if (pixel_size_x < PRECISION_THRESHOLD || pixel_size_y < PRECISION_THRESHOLD) {
         return 1;
     }
-    
+
     return 0;
 }
 
@@ -69,9 +69,11 @@ mp_bitcnt_t precision_calculate_gmp_bits(fractal* f) {
     zoom_factor = base_range / (f->xmax - f->xmin);
     
     // Précision basée sur le log2 du zoom
-    // Formule: prec = 64 + log2(zoom_factor) * 8
+    // Formule optimisée: prec = 64 + log2(zoom_factor) * 3.5
+    // On a besoin d'environ 3.32 bits par décade de zoom (log2(10) ≈ 3.32)
+    // Ajout d'une petite marge de sécurité
     if (zoom_factor > 1.0) {
-        prec = GMP_PREC_MIN + (mp_bitcnt_t)(log2(zoom_factor) * 8.0);
+        prec = GMP_PREC_MIN + (mp_bitcnt_t)(log2(zoom_factor) * 3.5);
     } else {
         prec = GMP_PREC_MIN;
     }
@@ -85,11 +87,21 @@ mp_bitcnt_t precision_calculate_gmp_bits(fractal* f) {
 
 void precision_update_fractal(fractal* f) {
     if (f == NULL) return;
-    
+
+    int old_use_gmp = f->use_gmp;
     f->use_gmp = precision_needs_gmp(f);
-    
+
     if (f->use_gmp) {
         f->gmp_precision = precision_calculate_gmp_bits(f);
+    }
+
+    // Afficher un message lors du changement de mode
+    if (old_use_gmp != f->use_gmp) {
+        if (f->use_gmp) {
+            printf("Switching to GMP high precision (%lu bits)\n", (unsigned long)f->gmp_precision);
+        } else {
+            printf("Switching back to double precision\n");
+        }
     }
 }
 

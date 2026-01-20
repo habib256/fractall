@@ -18,6 +18,9 @@
 /* Define if OpenMP is available */
 #undef HAVE_OPENMP
 
+/* Define if libpng is available */
+#undef HAVE_PNG
+
 /* Define if SSE4.1 is available */
 #undef HAVE_SSE4_1
 

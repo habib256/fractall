@@ -33,7 +33,9 @@ fractall_SOURCES = \
 	SDL_rotozoom.c \
 	SDL_rotozoom.h \
 	VonKoch.c \
-	VonKoch.h
+	VonKoch.h \
+	png_save.c \
+	png_save.h
 
 if HAVE_SSE4_1
 fractall_SOURCES += complexmath_simd.c
@@ -63,6 +65,10 @@ fractall_LDFLAGS =  -lm
 if HAVE_OPENMP
 AM_CFLAGS += $(OPENMP_CFLAGS)
 fractall_LDFLAGS += $(OPENMP_CFLAGS)
+endif
+
+if HAVE_PNG
+fractall_LDFLAGS += $(PNG_LIBS)
 endif
 
 fractall_LDADD =  \

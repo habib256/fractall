@@ -659,6 +659,8 @@ ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
+HAVE_PNG_FALSE
+HAVE_PNG_TRUE
 HAVE_AVX2_FALSE
 HAVE_AVX2_TRUE
 HAVE_AVX_FALSE
@@ -816,6 +818,7 @@ enable_sdltest
 with_gmp
 enable_openmp
 enable_simd
+with_png
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1491,6 +1494,7 @@ Optional Packages:
   --with-sdl-exec-prefix=PFX
                           exec prefix where SDL is installed (optional)
   --without-gmp           Disable GMP support for infinite zoom
+  --without-png           Disable PNG export support
 
 Some influential environment variables:
   CC          C compiler command
@@ -14201,6 +14205,91 @@ fi
 
 
 
+# Check whether --with-png was given.
+if test ${with_png+y}
+then :
+  withval=$with_png; use_png=$withval
+else $as_nop
+  use_png=yes
+fi
+
+
+have_png=no
+if test "x$use_png" != "xno"; then
+    ac_fn_c_check_header_compile "$LINENO" "png.h" "ac_cv_header_png_h" "$ac_includes_default"
+if test "x$ac_cv_header_png_h" = xyes
+then :
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for png_create_write_struct in -lpng" >&5
+printf %s "checking for png_create_write_struct in -lpng... " >&6; }
+if test ${ac_cv_lib_png_png_create_write_struct+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpng  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+char png_create_write_struct ();
+int
+main (void)
+{
+return png_create_write_struct ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"
+then :
+  ac_cv_lib_png_png_create_write_struct=yes
+else $as_nop
+  ac_cv_lib_png_png_create_write_struct=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_png_png_create_write_struct" >&5
+printf "%s\n" "$ac_cv_lib_png_png_create_write_struct" >&6; }
+if test "x$ac_cv_lib_png_png_create_write_struct" = xyes
+then :
+  PNG_LIBS="-lpng"
+
+printf "%s\n" "#define HAVE_PNG 1" >>confdefs.h
+
+             have_png=yes
+else $as_nop
+  have_png=no
+fi
+
+else $as_nop
+  have_png=no
+fi
+
+fi
+
+ if test "x$have_png" = "xyes"; then
+  HAVE_PNG_TRUE=
+  HAVE_PNG_FALSE='#'
+else
+  HAVE_PNG_TRUE='#'
+  HAVE_PNG_FALSE=
+fi
+
+
+if test "x$have_png" = "xyes"; then
+    LIBS="$LIBS $PNG_LIBS"
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: PNG export support enabled" >&5
+printf "%s\n" "$as_me: PNG export support enabled" >&6;}
+else
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: PNG export support disabled - BMP fallback will be used" >&5
+printf "%s\n" "$as_me: PNG export support disabled - BMP fallback will be used" >&6;}
+fi
+
+
 
 
 
@@ -14363,6 +14452,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${HAVE_AVX2_TRUE}" && test -z "${HAVE_AVX2_FALSE}"; then
   as_fn_error $? "conditional \"HAVE_AVX2\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${HAVE_PNG_TRUE}" && test -z "${HAVE_PNG_FALSE}"; then
+  as_fn_error $? "conditional \"HAVE_PNG\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

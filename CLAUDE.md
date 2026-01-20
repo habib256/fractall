@@ -3,8 +3,8 @@
 Visualiseur de fractales portable en C utilisant SDL.
 
 **Licence** : GPL-2.0
-**Auteur** : Arnaud VERHILLE (2001-2003)
-**Version** : 0.5
+**Auteur** : Arnaud VERHILLE (2001-2026)
+**Version** : 1.0
 
 ## Compilation
 
@@ -23,6 +23,8 @@ make
 | `--without-gmp` | Désactive GMP | - |
 | `--disable-openmp` | Désactive le calcul parallèle OpenMP | activé |
 | `--disable-simd` | Désactive les optimisations SIMD | activé |
+| `--with-png` | Active l'export PNG avec métadonnées | activé |
+| `--without-png` | Désactive le support PNG (fallback BMP) | - |
 
 ### Dépendances
 
@@ -30,6 +32,7 @@ make
 - Bibliothèque mathématique (`-lm`)
 - GMP (optionnel) : précision arbitraire pour zooms profonds
 - OpenMP (optionnel) : calcul parallèle multi-cœurs
+- libpng (optionnel) : export PNG avec métadonnées
 
 ## Utilisation
 
@@ -63,11 +66,12 @@ fractall [OPTIONS]
 | **F11** | Mandelbulb |
 | **F12** | Buddhabrot |
 | **GUI** | 23 boutons pour sélectionner toutes les fractales (types 1-23) |
-| **Clic gauche** | Zoom / +1 itération (vectorielles) |
+| **Clic gauche** | Zoom centré sur le point cliqué / +1 itération (vectorielles) |
+| **Clic gauche + glisser** | Sélection de zone rectangulaire pour zoom précis (escape-time uniquement) |
 | **Clic droit** | Dézoom / -1 itération |
 | **C** | Changer palette |
 | **R** | Changer nombre de répétitions du gradient (2, 4, 6, 8, 10, 12, 14, 16, 18, 20) - Par défaut : 20 pour escape-time, 2 pour Lyapunov |
-| **S** | Screenshot (Screenshot.bmp) |
+| **S** | Screenshot (Screenshot.png avec métadonnées, fallback BMP si PNG indisponible) |
 | **Q/ESC** | Quitter |
 
 **Note** : Les types 9-12 (Barnsley, Magnet), 17 (Lyapunov) et 18-23 (Perpendicular Burning Ship, Celtic, Alpha Mandelbrot, Pickover Stalks, Nova, Multibrot) sont accessibles uniquement via les boutons GUI.
@@ -76,7 +80,7 @@ fractall [OPTIONS]
 
 ```
 src/
-├── main.c           # Point d'entrée, événements
+├── main.c           # Point d'entrée, événements, zoom par sélection
 ├── EscapeTime.[ch]  # Fractales escape-time (23 types)
 ├── colorization.[ch] # Système unifié de colorisation (9 palettes)
 ├── color_types.h    # Type color unifié
@@ -87,6 +91,7 @@ src/
 ├── complexmath_simd.c   # Arithmétique SIMD (SSE4.1/AVX)
 ├── precision_detector.[ch] # Détection précision GMP
 ├── gmp_pool.[ch]    # Pool de mémoire GMP pour optimisations
+├── png_save.[ch]    # Export PNG avec métadonnées (optionnel)
 └── SDL_gfx*         # Primitives graphiques
 ```
 
@@ -255,6 +260,16 @@ Opérations vectorisées sur nombres complexes (`complexmath_simd.c`) :
 
 La détection des instructions SIMD est automatique à la compilation.
 
+## Zoom par sélection de zone
+
+Pour les fractales escape-time (types 3-23), un zoom par sélection de zone rectangulaire est disponible :
+
+1. **Maintenir** le clic gauche et **glisser** pour dessiner un rectangle jaune
+2. **Relâcher** pour zoomer sur la zone sélectionnée
+3. Le rapport d'aspect est automatiquement préservé
+
+Cette fonctionnalité est implémentée dans `main.c` (événements `SDL_MOUSEBUTTONDOWN`, `SDL_MOUSEMOTION`, `SDL_MOUSEBUTTONUP`).
+
 ## Précision GMP
 
 Avec `--with-gmp`, le programme détecte automatiquement quand la précision double (53 bits) devient insuffisante et bascule vers GMP. La précision augmente dynamiquement avec le niveau de zoom.
@@ -271,7 +286,11 @@ Fichiers clés :
 
 ## Barre d'état
 
-Affiche : Type | Palette | Zoom | Centre (x,y) | Temps rendu (ms)
+Affiche : Type | Rep:N | Palette | Iter:N | Zoom | Centre (x,y) | Temps (ms) | [Précision GMP]
+
+- **Rep:N** : Nombre de répétitions du gradient
+- **Iter:N** : Nombre d'itérations maximum
+- **Précision GMP** : Affiché uniquement si GMP est actif (ex: "GMP 128 bits")
 
 ## Flux d'exécution
 
@@ -289,9 +308,27 @@ main()
               └── Quit
 ```
 
+## Export PNG avec métadonnées
+
+L'export PNG (touche **S**) inclut des métadonnées permettant de recalculer la fractale :
+
+| Métadonnée | Description |
+|------------|-------------|
+| FractalType | Type de fractale (1-23) |
+| XMin, XMax, YMin, YMax | Coordonnées du plan complexe |
+| Iterations | Nombre d'itérations maximum |
+| Bailout | Seuil d'échappement |
+| ColorMode | Index de la palette (0-8) |
+| ColorRepeat | Nombre de répétitions du gradient |
+| JuliaSeedX, JuliaSeedY | Seed Julia (types 4 et 5 uniquement) |
+| ImageWidth, ImageHeight | Dimensions en pixels |
+| Software | "fractall 0.5" |
+
+La fonction `LoadPNGMetadata()` permet de recharger ces paramètres depuis un fichier PNG.
+
 ## TODO
 
-- Export PNG avec métadonnées
+- ~~Export PNG avec métadonnées~~ ✅ Implémenté
 - Historique zoom (undo/redo)
 - Palettes personnalisables
 - Amélioration du GUI (voir section ci-dessous)
@@ -350,8 +387,10 @@ Voir **PLAN_RECHERCHE_FRACTALES.md** pour le plan détaillé de recherche et d'i
 - `Lyapunov_Draw()` pour le type 17 (algorithme d'exposant de Lyapunov - Zircon City)
 - `Fractal_Draw()` détecte automatiquement les types 16-17 et appelle leurs fonctions spécialisées
 - `Fractal_GetTypeName()` retourne le nom selon le type (0-23)
+- `SavePNGWithMetadata()` et `LoadPNGMetadata()` pour l'export/import PNG avec métadonnées
 - OpenMP : `HAVE_OPENMP` défini dans `config.h` si disponible
 - SIMD : `HAVE_SSE4_1`, `HAVE_AVX`, `HAVE_AVX2` définis selon le support CPU
+- PNG : `HAVE_PNG` défini dans `config.h` si libpng disponible
 
 ## Propositions d'amélioration du GUI
 
