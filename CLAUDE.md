@@ -106,57 +106,169 @@ src/
 
 ### Escape-time - Types 3-23
 
-| Type | Nom | Formule |
-|------|-----|---------|
-| 3 | Mandelbrot | z(n+1) = z(n)² + c |
-| 4 | Julia | z(n+1) = z(n)² + seed |
-| 5 | Julia Sin | z(n+1) = c × sin(z(n)) |
-| 6 | Newton | z(n+1) = ((p-1)×z^p + 1) / (p×z^(p-1)) |
-| 7 | Phoenix | z(n+1) = z(n)² + p1 + p2×y(n) |
-| 8 | Buffalo | z(n+1) = abs(Re(z²)) + i×abs(Im(z²)) + c |
-| 9 | Barnsley J | z(n+1) = (z±1)×c selon Re(z) |
-| 10 | Barnsley M | Variante Mandelbrot de Barnsley |
-| 11 | Magnet J | Formule magnétique (Julia) |
-| 12 | Magnet M | Formule magnétique (Mandelbrot) |
-| 13 | Burning Ship | z(n+1) = (\|Re(z)\| + i\|Im(z)\|)² + c |
-| 14 | Tricorn | z(n+1) = conj(z)² + c |
-| 15 | Mandelbulb | z(n+1) = z(n)⁸ + c |
-| 16 | Buddhabrot | Densité des trajectoires d'échappement |
-| 17 | Lyapunov Zircon City | Exposant de Lyapunov (séquence "BBBBBBAAAAAA", domaine [2.5, 3.4] × [3.4, 4.0]) |
-| 18 | Perpendicular Burning Ship | z(n+1) = (Re(z) - i×\|Im(z)\|)² + c |
-| 19 | Celtic | z(n+1) = \|Re(z²)\| + i×Im(z²) + c |
-| 20 | Alpha Mandelbrot | z(n+1) = z² + (z² + c)² + c |
-| 21 | Pickover Stalks | z(n+1) = z² + c avec orbit trap min(\|Re(z)\|, \|Im(z)\|) |
-| 22 | Nova | z(n+1) = z - a·(p(z)/p'(z)) + c (p(z) = z³ - 1) |
-| 23 | Multibrot | z(n+1) = z^d + c (d réel non-entier, ex: 2.5) |
+| Type | Nom | Formule (extrait de `EscapeTime.c`) |
+|------|-----|-------------------------------------|
+| 3 | Mandelbrot | `z(0) = seed` (généralement 0)<br>`z(n+1) = z(n)² + c`<br>où `c = zPixel` |
+| 4 | Julia | `z(0) = zPixel`<br>`z(n+1) = z(n)² + seed` |
+| 5 | Julia Sin | `z(0) = zPixel`<br>`z(n+1) = seed × sin(z(n))` |
+| 6 | Newton | `z(0) = zPixel`<br>`z(n+1) = ((p-1)×z(n)^p + 1) / (p×z(n)^(p-1))`<br>où `p = Re(seed)` (degré polynomial, par défaut 8) |
+| 7 | Phoenix | `z(0) = zPixel`, `y(0) = 0`<br>`z(n+1) = z(n)² + p1 + p2×y(n)`<br>`y(n+1) = z(n)`<br>où `p1 = 0.56667`, `p2 = -0.5` |
+| 8 | Buffalo | `z(0) = seed` (généralement 0)<br>`z² = z×z`<br>`z(n+1) = abs(Re(z²)) + i×abs(Im(z²)) + c` |
+| 9 | Barnsley J | `z(0) = zPixel`<br>Si `Re(z) ≥ 0` : `z(n+1) = (z - 1) × seed`<br>Sinon : `z(n+1) = (z + 1) × seed` |
+| 10 | Barnsley M | `z(0) = zPixel`, `c = zPixel`<br>Si `Re(z) ≥ 0` : `z(n+1) = (z - 1) × c`<br>Sinon : `z(n+1) = (z + 1) × c` |
+| 11 | Magnet J | `z(0) = zPixel`<br>`N = (z² + (seed - 1))²`<br>`Q = 2×z + (seed - 2)`<br>`z(n+1) = N / Q` |
+| 12 | Magnet M | `z(0) = 0`, `c = zPixel`<br>`N = (z² + (c - 1))²`<br>`Q = 2×z + (c - 2)`<br>`z(n+1) = N / Q` |
+| 13 | Burning Ship | `z(0) = seed` (généralement 0)<br>`z(n+1) = (\|Re(z)\| + i×\|Im(z)\|)² + c` |
+| 14 | Tricorn | `z(0) = seed` (généralement 0)<br>`z(n+1) = (conjugué(z))² + c`<br>où `conjugué(z) = Re(z) - i×Im(z)` |
+| 15 | Mandelbulb | `z(0) = seed` (généralement 0)<br>`z(n+1) = z(n)⁸ + c`<br>calculé via `z² → z⁴ → z⁸` |
+| 16 | Buddhabrot | Algorithme de densité : échantillonnage aléatoire, traçage des trajectoires d'échappement |
+| 17 | Lyapunov Zircon City | `x_{n+1} = r_n × x_n × (1 - x_n)`<br>séquence "BBBBBBAAAAAA" (r alterne entre a et b)<br>domaine [2.5, 3.4] × [3.4, 4.0] |
+| 18 | Perpendicular Burning Ship | `z(0) = seed` (généralement 0)<br>`z(n+1) = (Re(z) - i×\|Im(z)\|)² + c`<br>soit `x_{n+1} = x_n² - \|y_n\|² + c_x`<br>`y_{n+1} = -2×x_n×\|y_n\| + c_y` |
+| 19 | Celtic | `z(0) = seed` (généralement 0)<br>`z² = (x² - y²) + i(2xy)`<br>`z(n+1) = \|Re(z²)\| + i×Im(z²) + c` |
+| 20 | Alpha Mandelbrot | `z(0) = seed` (généralement 0)<br>`m = z² + c`<br>`z(n+1) = z² + m² + c`<br>soit `z(n+1) = z² + (z² + c)² + c` |
+| 21 | Pickover Stalks | `z(0) = seed` (généralement 0)<br>`z(n+1) = z² + c` (Mandelbrot)<br>avec orbit trap : `trap_distance = min(\|Re(z)\|, \|Im(z)\|)`<br>coloration basée sur `-log(trap_min)` |
+| 22 | Nova | `z(0) = 1` (racine de z³ - 1 = 0)<br>`p(z) = z^p - 1` (p=3 par défaut)<br>`p'(z) = p×z^(p-1)`<br>`z(n+1) = z - a×(p(z)/p'(z)) + c`<br>où `a = 1.0` (relaxation) |
+| 23 | Multibrot | `z(0) = seed` (généralement 0)<br>`z(n+1) = z^d + c`<br>où `d = 2.5` (réel non-entier)<br>calculé via `z^d = exp(d×log(z))` (branche principale) |
 
 ### Buffalo (Type 8)
 
 Variation du Burning Ship avec `abs()` appliqué aux deux parties après le carré :
-- Formule : `z(n+1) = abs(Re(z²)) + i×abs(Im(z²)) + c`
+- **Formule** : `z(0) = seed` (généralement 0)<br>`z² = z×z`<br>`z(n+1) = abs(Re(z²)) + i×abs(Im(z²)) + c`
 - Produit des formes symétriques ressemblant à un bison
 - Accessible via **F8** ou bouton GUI
+- Valeurs par défaut : domaine [-2.5, 1.5] × [-2.0, 2.0], bailout=4, iterationMax=9370
 
 ### Buddhabrot (Type 16)
 
 Algorithme de densité différent :
 1. Échantillonnage aléatoire du plan complexe
-2. Trace les trajectoires des points qui s'échappent
+2. Trace les trajectoires des points qui s'échappent (itération Mandelbrot : `z(n+1) = z² + c`)
 3. Incrémente un compteur de densité par pixel traversé
-4. Couleur finale basée sur densité (échelle log)
+4. Couleur finale basée sur densité (échelle logarithmique)
+- Valeurs par défaut : domaine [-2.5, 1.5] × [-1.5, 1.5], bailout=4, iterationMax=220
 
 ### Lyapunov (Type 17)
 
-Algorithme basé sur l'exposant de Lyapunov de la suite logistique x_{n+1} = r_n × x_n × (1 - x_n) :
+Algorithme basé sur l'exposant de Lyapunov de la suite logistique :
+
+**Formule** : `x_{n+1} = r_n × x_n × (1 - x_n)`
 
 **Principe** :
-1. Le paramètre r alterne entre a (axe X) et b (axe Y) selon la séquence "BBBBBBAAAAAA"
+1. Le paramètre `r` alterne entre `a` (axe X) et `b` (axe Y) selon la séquence "BBBBBBAAAAAA"
 2. Phase de stabilisation (warmup) de 50 itérations
-3. Calcul de l'exposant sur 2000 itérations par défaut
+3. Calcul de l'exposant de Lyapunov sur 2000 itérations par défaut
 4. Coloration avec palettes (SmoothPlasma par défaut, 2 répétitions par défaut)
 5. Domaine : [2.5, 3.4] × [3.4, 4.0] (image de référence classique "Zircon City")
 
 **Note** : Les variantes Lyapunov 18-27 ont été supprimées. Seule Zircon City (type 17) est conservée.
+
+## Détails des formules (extraits de `EscapeTime.c`)
+
+### Type 3 - Mandelbrot
+- **Fonction** : `Mendelbrot_Iteration()`
+- **Formule** : `z(0) = seed` (généralement 0), `z(n+1) = z(n)² + c` où `c = zPixel`
+- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=9370, zoomfactor=8
+
+### Type 4 - Julia
+- **Fonction** : `Julia_Iteration()`
+- **Formule** : `z(0) = zPixel`, `z(n+1) = z(n)² + seed`
+- **Valeurs par défaut** : domaine [-2.0, 2.0] × [-1.5, 1.5], seed=(0.36228, -0.0777), bailout=4, iterationMax=6250, zoomfactor=4
+
+### Type 5 - Julia Sin
+- **Fonction** : `JuliaSin_Iteration()`
+- **Formule** : `z(0) = zPixel`, `z(n+1) = seed × sin(z(n))`
+- **Valeurs par défaut** : domaine [-π, π] × [-2, 2], seed=(1, 0.1), bailout=4, iterationMax=6250, zoomfactor=4
+
+### Type 6 - Newton
+- **Fonction** : `Newton_Iteration()`
+- **Formule** : `z(0) = zPixel`, `z(n+1) = ((p-1)×z(n)^p + 1) / (p×z(n)^(p-1))` où `p = Re(seed)` (degré polynomial)
+- **Valeurs par défaut** : seed=(8, 0) donc p=8, bailout=4, iterationMax variable selon précision
+
+### Type 7 - Phoenix
+- **Fonction** : `Phoenix_Iteration()`
+- **Formule** : `z(0) = zPixel`, `y(0) = 0`<br>`z(n+1) = z(n)² + p1 + p2×y(n)`<br>`y(n+1) = z(n)`<br>où `p1 = 0.56667`, `p2 = -0.5`
+- **Valeurs par défaut** : domaine [-2.0, 2.0] × [-1.5, 1.5], bailout=4, iterationMax=9370, zoomfactor=8
+
+### Type 8 - Buffalo
+- **Fonction** : `Buffalo_Iteration()`
+- **Formule** : `z(0) = seed` (généralement 0)<br>`z² = z×z`<br>`z(n+1) = abs(Re(z²)) + i×abs(Im(z²)) + c`
+- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-2.0, 2.0], seed=0, bailout=4, iterationMax=9370, zoomfactor=8
+
+### Type 9 - Barnsley J (Julia)
+- **Fonction** : `Barnsley1j_Iteration()`
+- **Formule** : `z(0) = zPixel`<br>Si `Re(z) ≥ 0` : `z(n+1) = (z - 1) × seed`<br>Sinon : `z(n+1) = (z + 1) × seed`
+- **Valeurs par défaut** : domaine [-4, 4] × [-3, 3], seed=(1.1, 0.6), bailout=4, iterationMax=3120, zoomfactor=4
+
+### Type 10 - Barnsley M (Mandelbrot)
+- **Fonction** : `Barnsley1m_Iteration()`
+- **Formule** : `z(0) = zPixel`, `c = zPixel`<br>Si `Re(z) ≥ 0` : `z(n+1) = (z - 1) × c`<br>Sinon : `z(n+1) = (z + 1) × c`
+- **Valeurs par défaut** : domaine [-3, 3] × [-2, 2], bailout=4, iterationMax=9370, zoomfactor=8
+
+### Type 11 - Magnet J (Julia)
+- **Fonction** : `Magnet1j_Iteration()`
+- **Formule** : `z(0) = zPixel`<br>`N = (z² + (seed - 1))²`<br>`Q = 2×z + (seed - 2)`<br>`z(n+1) = N / Q`
+- **Valeurs par défaut** : domaine [-2, 2] × [-2, 2], seed=(1.625458, -0.306159), bailout=4, iterationMax=9370, zoomfactor=4
+
+### Type 12 - Magnet M (Mandelbrot)
+- **Fonction** : `Magnet1m_Iteration()`
+- **Formule** : `z(0) = 0`, `c = zPixel`<br>`N = (z² + (c - 1))²`<br>`Q = 2×z + (c - 2)`<br>`z(n+1) = N / Q`
+- **Valeurs par défaut** : domaine [-3, 2] × [-2, 2], bailout=4, iterationMax=9370, zoomfactor=8
+
+### Type 13 - Burning Ship
+- **Fonction** : `BurningShip_Iteration()`
+- **Formule** : `z(0) = seed` (généralement 0)<br>`z(n+1) = (|Re(z)| + i×|Im(z)|)² + c`
+- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-2.0, 2.0], seed=0, bailout=4, iterationMax=9370, zoomfactor=8
+
+### Type 14 - Tricorn
+- **Fonction** : `Tricorn_Iteration()`
+- **Formule** : `z(0) = seed` (généralement 0)<br>`z(n+1) = (conjugué(z))² + c`<br>où `conjugué(z) = Re(z) - i×Im(z)`
+- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=9370, zoomfactor=8
+
+### Type 15 - Mandelbulb
+- **Fonction** : `Mandelbulb_Iteration()`
+- **Formule** : `z(0) = seed` (généralement 0)<br>`z(n+1) = z(n)⁸ + c`<br>calculé via `z² → z⁴ → z⁸`
+- **Valeurs par défaut** : domaine [-1.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=9370, zoomfactor=8
+
+### Type 16 - Buddhabrot
+- **Fonction** : `Buddhabrot_Draw()` (algorithme spécial)
+- **Formule de base** : `z(n+1) = z² + c` (Mandelbrot)
+- **Algorithme** : Échantillonnage aléatoire, traçage des trajectoires d'échappement
+- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=220, zoomfactor=4
+
+### Type 17 - Lyapunov Zircon City
+- **Fonction** : `Lyapunov_Draw()` (algorithme spécial)
+- **Formule** : `x_{n+1} = r_n × x_n × (1 - x_n)`<br>séquence "BBBBBBAAAAAA" (r alterne entre a et b)
+- **Valeurs par défaut** : domaine [2.5, 3.4] × [3.4, 4.0], warmup=50, iterations=2000
+
+### Type 18 - Perpendicular Burning Ship
+- **Fonction** : `PerpendicularBurningShip_Iteration()`
+- **Formule** : `z(0) = seed` (généralement 0)<br>`z(n+1) = (Re(z) - i×|Im(z)|)² + c`<br>soit `x_{n+1} = x_n² - |y_n|² + c_x`<br>`y_{n+1} = -2×x_n×|y_n| + c_y`
+- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=5000, zoomfactor=8
+
+### Type 19 - Celtic
+- **Fonction** : `Celtic_Iteration()`
+- **Formule** : `z(0) = seed` (généralement 0)<br>`z² = (x² - y²) + i(2xy)`<br>`z(n+1) = |Re(z²)| + i×Im(z²) + c`
+- **Valeurs par défaut** : domaine [-2.0, 1.0] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=5000, zoomfactor=8
+
+### Type 20 - Alpha Mandelbrot
+- **Fonction** : `AlphaMandelbrot_Iteration()`
+- **Formule** : `z(0) = seed` (généralement 0)<br>`m = z² + c`<br>`z(n+1) = z² + m² + c`<br>soit `z(n+1) = z² + (z² + c)² + c`
+- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=2000, zoomfactor=8
+
+### Type 21 - Pickover Stalks
+- **Fonction** : `PickoverStalks_Iteration()`
+- **Formule** : `z(0) = seed` (généralement 0)<br>`z(n+1) = z² + c` (Mandelbrot)<br>avec orbit trap : `trap_distance = min(|Re(z)|, |Im(z)|)`<br>coloration basée sur `-log(trap_min)` normalisé
+- **Valeurs par défaut** : domaine [-2.0, 1.0] × [-1.5, 1.5], seed=0, bailout=100.0, iterationMax=1000, zoomfactor=8
+
+### Type 22 - Nova
+- **Fonction** : `Nova_Iteration()`
+- **Formule** : `z(0) = 1` (racine de z³ - 1 = 0)<br>`p(z) = z^p - 1` (p=3 par défaut)<br>`p'(z) = p×z^(p-1)`<br>`z(n+1) = z - a×(p(z)/p'(z)) + c`<br>où `a = 1.0` (relaxation)
+- **Valeurs par défaut** : domaine [-3.0, 3.0] × [-2.0, 2.0], seed=0, bailout=20.0, iterationMax=500, zoomfactor=4
+
+### Type 23 - Multibrot
+- **Fonction** : `Multibrot_Iteration()`
+- **Formule** : `z(0) = seed` (généralement 0)<br>`z(n+1) = z^d + c`<br>où `d = 2.5` (réel non-entier)<br>calculé via `z^d = exp(d×log(z))` (branche principale)
+- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=5000, zoomfactor=8
 
 ## Palettes de couleurs
 
