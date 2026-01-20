@@ -30,26 +30,72 @@ gui SDLGUI_Init(int x, int y, int w, int h,int stateH, Uint32 bgcolor, int butto
 
   g.barh = 8;  // Hauteur fixe
   g.buttonSize = g.h - (g.barh + 4) - 4;
+  // Protection contre buttonSize négatif ou trop petit
+  if (g.buttonSize < 1) g.buttonSize = 1;
 
   g.xplace = 0;  // For now, start by show the first button
   g.xplaceMax = (2 + (g.buttonSize + 2) * g.buttonNumber) - g.w;
+  if (g.xplaceMax < 0) g.xplaceMax = 0;  // Protection contre valeur négative
 
   if (g.w >= ((g.buttonSize+2)*buttonNumber)) {
     g.barw = g.w - 4;
   } else {
-    g.barw = g.w*(g.w-4)/((g.buttonSize+2)*buttonNumber);
+    // Utiliser division flottante pour éviter barw = 0
+    double barw_double = (double)g.w * (double)(g.w - 4) / ((double)(g.buttonSize + 2) * (double)buttonNumber);
+    g.barw = (int)barw_double;
+    if (g.barw < 1) g.barw = 1;  // Largeur minimale de 1 pixel
+  }
+
+  g.selectedType = 1;  // Type par défaut (Von Koch)
+  g.hoverButton = -1;   // Aucun bouton survolé initialement
+
+  // Allouer les tableaux de cache
+  g.buttonCache = (SDL_Surface**) calloc(buttonNumber, sizeof(SDL_Surface*));
+  g.buttonCacheValid = (int*) calloc(buttonNumber, sizeof(int));
+  
+  if (g.buttonCache == NULL || g.buttonCacheValid == NULL) {
+    fprintf(stderr, "Erreur allocation mémoire pour le cache des boutons\n");
+    // Libérer ce qui a pu être alloué
+    if (g.buttonCache != NULL) {
+      free(g.buttonCache);
+      g.buttonCache = NULL;
+    }
+    if (g.buttonCacheValid != NULL) {
+      free(g.buttonCacheValid);
+      g.buttonCacheValid = NULL;
+    }
   }
 
   return g;
 }
 
 void SDLGUI_Destroy(gui* g) {
-  // Rien à libérer pour l'instant
+  if (g == NULL) return;
+  
+  // Libérer les surfaces du cache
+  if (g->buttonCache != NULL) {
+    for (int i = 0; i < g->buttonNumber; i++) {
+      if (g->buttonCache[i] != NULL) {
+        SDL_FreeSurface(g->buttonCache[i]);
+        g->buttonCache[i] = NULL;
+      }
+    }
+    free(g->buttonCache);
+    g->buttonCache = NULL;
+  }
+  
+  // Libérer le tableau de flags
+  if (g->buttonCacheValid != NULL) {
+    free(g->buttonCacheValid);
+    g->buttonCacheValid = NULL;
+  }
 }
 
 int SDLGUI_ButtonNumberRead (gui* g, int x) {
   int buttonNb;
   x = x - 2;
+  // Protection contre division par zéro
+  if (g->buttonSize + 2 <= 0) return 0;
   buttonNb = (int) (x / (g->buttonSize +2));
   return buttonNb;
 }
@@ -86,45 +132,167 @@ void SDLGUI_StateBar_Draw (SDL_Surface* screen, gui* g) {
 
 void SDLGUI_MenuBar_Draw (SDL_Surface* screen, gui* g) {
   SDLGUI_Draw3DBox (screen, g->x, (g->buttonSize+4), g->w, g->h - (g->buttonSize+4), g->bgcolor, 1);
-  SDLGUI_Draw3DBox (screen, 2+(g->xplace*(g->w-(g->barw+4))/g->xplaceMax), g->buttonSize+6, g->barw, g->barh, g->bgcolor, 0);
+  // Protection contre division par zéro : si xplaceMax est 0, tous les boutons rentrent dans l'écran
+  int barX = 2;
+  if (g->xplaceMax > 0) {
+    barX = 2 + (g->xplace * (g->w - (g->barw + 4)) / g->xplaceMax);
+  }
+  SDLGUI_Draw3DBox (screen, barX, g->buttonSize+6, g->barw, g->barh, g->bgcolor, 0);
+}
+
+// Génère l'image d'un bouton et la retourne (ou NULL en cas d'erreur)
+static SDL_Surface* SDLGUI_GenerateButtonImage(SDL_Surface* screen, gui* g, int buttonNumber) {
+  int buttonSize = g->buttonSize - 4;  // Taille interne du bouton
+  SDL_Surface* buttonSurface = NULL;
+  
+  // Créer une surface temporaire avec le même format que screen
+  buttonSurface = SDL_CreateRGBSurface(
+    SDL_SWSURFACE,
+    buttonSize, buttonSize,
+    screen->format->BitsPerPixel,
+    screen->format->Rmask, screen->format->Gmask,
+    screen->format->Bmask, screen->format->Amask
+  );
+  
+  if (buttonSurface == NULL) {
+    fprintf(stderr, "Erreur création surface pour bouton %d: %s\n", buttonNumber, SDL_GetError());
+    return NULL;
+  }
+  
+  // Remplir avec la couleur de fond
+  SDL_FillRect(buttonSurface, NULL, g->bgcolor);
+  
+  // Dessiner la fractale selon le type
+  switch (buttonNumber) {
+    case 1:
+      // Von Koch
+      VonKochDraw(buttonSurface, 0, 0, buttonSize, buttonSize, 2);
+      break;
+      
+    case 2:
+      // Dragon
+      DragonFractDraw(buttonSurface, 0, 0, buttonSize, buttonSize, 8);
+      break;
+      
+    case 16:
+      {
+        // Buddhabrot utilise son propre algorithme de rendu
+        fractal f;
+        f = Fractal_Init(buttonSize, buttonSize, 16);
+        Buddhabrot_Draw(buttonSurface, &f, 0, 0, NULL);
+        Fractal_Destroy(f);
+      }
+      break;
+      
+    case 17:
+      {
+        // Le type Lyapunov (17) utilise son propre algorithme de rendu
+        fractal f;
+        f = Fractal_Init(buttonSize, buttonSize, 17);
+        Fractal_Draw(buttonSurface, f, 0, 0, NULL);
+        Fractal_Destroy(f);
+      }
+      break;
+      
+    default:
+      {
+        // Autres types de fractales escape-time
+        fractal f;
+        f = Fractal_Init(buttonSize, buttonSize, buttonNumber);
+        Fractal_Draw(buttonSurface, f, 0, 0, NULL);
+        Fractal_Destroy(f);
+      }
+      break;
+  }
+  
+  return buttonSurface;
 }
 
 void SDLGUI_Button_Draw (SDL_Surface* screen, gui* g, int xplace) {
+  int buttonNumber = SDLGUI_ButtonNumberRead (g, xplace) + 1;
+  int cacheIndex = buttonNumber - 1;  // Index dans le tableau (0-22)
+  
   SDLGUI_Draw3DBox (screen, xplace, 2, g->buttonSize, g->buttonSize, g->bgcolor, 0);
-  switch (SDLGUI_ButtonNumberRead (g, xplace)+1) {
-  case 1:
-  	VonKochDraw (screen, xplace+2 ,4,g->buttonSize+xplace-2,g->buttonSize-1,2 );
-  break;
-  case 2:
-  	DragonFractDraw (screen, xplace+2 ,4,g->buttonSize+xplace-2,g->buttonSize-1,8 );
-  break;
-  case 16:
-  {
-  	// Buddhabrot utilise son propre algorithme de rendu
-  	fractal f;
-	f = Fractal_Init (g->buttonSize-4, g->buttonSize-4, 16);
-	Buddhabrot_Draw (screen, &f, xplace+2, 4, NULL);  // NULL = pas de progression pour le bouton
-	Fractal_Destroy (f);
+  
+  // Vérifier si le cache existe et est valide
+  if (g->buttonCache != NULL && g->buttonCacheValid != NULL &&
+      cacheIndex >= 0 && cacheIndex < g->buttonNumber &&
+      g->buttonCacheValid[cacheIndex] && g->buttonCache[cacheIndex] != NULL) {
+    // Utiliser le cache : blitter l'image du cache sur screen
+    SDL_Rect dstRect;
+    dstRect.x = xplace + 2;  // Marge interne du bouton
+    dstRect.y = 4;           // Marge interne du bouton
+    dstRect.w = g->buttonSize - 4;
+    dstRect.h = g->buttonSize - 4;
+    SDL_BlitSurface(g->buttonCache[cacheIndex], NULL, screen, &dstRect);
+  } else {
+    // Générer l'image et la mettre en cache
+    SDL_Surface* buttonImage = SDLGUI_GenerateButtonImage(screen, g, buttonNumber);
+    if (buttonImage != NULL) {
+      // Stocker dans le cache
+      if (g->buttonCache != NULL && g->buttonCacheValid != NULL &&
+          cacheIndex >= 0 && cacheIndex < g->buttonNumber) {
+        // Libérer l'ancienne surface si elle existe
+        if (g->buttonCache[cacheIndex] != NULL) {
+          SDL_FreeSurface(g->buttonCache[cacheIndex]);
+        }
+        g->buttonCache[cacheIndex] = buttonImage;
+        g->buttonCacheValid[cacheIndex] = 1;
+      }
+      
+      // Blitter l'image sur screen
+      SDL_Rect dstRect;
+      dstRect.x = xplace + 2;  // Marge interne du bouton
+      dstRect.y = 4;           // Marge interne du bouton
+      dstRect.w = g->buttonSize - 4;
+      dstRect.h = g->buttonSize - 4;
+      SDL_BlitSurface(buttonImage, NULL, screen, &dstRect);
+    } else {
+      // En cas d'erreur, dessiner directement (fallback)
+      // Ce code ne devrait normalement jamais être exécuté si tout fonctionne
+      switch (buttonNumber) {
+        case 1:
+          VonKochDraw (screen, xplace+2, 4, g->buttonSize+xplace-2, g->buttonSize-1, 2);
+          break;
+        case 2:
+          DragonFractDraw (screen, xplace+2, 4, g->buttonSize+xplace-2, g->buttonSize-1, 8);
+          break;
+        case 16:
+          {
+            fractal f;
+            f = Fractal_Init (g->buttonSize-4, g->buttonSize-4, 16);
+            Buddhabrot_Draw (screen, &f, xplace+2, 4, NULL);
+            Fractal_Destroy (f);
+          }
+          break;
+        case 17:
+          {
+            fractal f;
+            f = Fractal_Init (g->buttonSize-4, g->buttonSize-4, 17);
+            Fractal_Draw (screen, f, xplace+2, 4, NULL);
+            Fractal_Destroy (f);
+          }
+          break;
+        default:
+          {
+            fractal f;
+            f = Fractal_Init (g->buttonSize-4, g->buttonSize-4, buttonNumber);
+            Fractal_Draw (screen, f, xplace+2, 4, NULL);
+            Fractal_Destroy (f);
+          }
+          break;
+      }
+    }
   }
-  break;
-  case 17:
-  {
-  	// Le type Lyapunov (17) utilise son propre algorithme de rendu
-  	fractal f;
-	f = Fractal_Init (g->buttonSize-4, g->buttonSize-4, SDLGUI_ButtonNumberRead (g, xplace)+1);
-	Fractal_Draw (screen, f, xplace+2, 4, NULL);  // NULL = pas de progression pour le bouton
-	Fractal_Destroy (f);
-  }
-  break;
-  default:
-  {
-  	fractal f;
-	f = Fractal_Init (g->buttonSize-4, g->buttonSize-4,SDLGUI_ButtonNumberRead (g, xplace)+1);
-	Fractal_Draw (screen, f, xplace+2, 4, NULL);  // NULL = pas de progression pour le bouton
-	Fractal_Destroy (f);
-	}
-	break;
-
+  
+  // Dessiner un cadre de couleur autour du bouton sélectionné (après le contenu du bouton)
+  if (buttonNumber == g->selectedType) {
+    // Cadre de couleur (bleu/cyan pour la sélection) - épaisseur 2 pixels
+    rectangleRGBA(screen, xplace - 2, 0, xplace + g->buttonSize + 1, g->buttonSize + 3, 
+                  0, 150, 255, 255);  // Bleu cyan
+    // Cadre intérieur pour plus de visibilité
+    rectangleRGBA(screen, xplace - 1, 1, xplace + g->buttonSize, g->buttonSize + 2, 
+                  0, 200, 255, 255);  // Bleu cyan plus clair
   }
 }
 

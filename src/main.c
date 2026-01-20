@@ -111,7 +111,7 @@ main (int argc, char *argv[])
 			  "   -x Pixel width for main window (default : 1024)\n");
 		  fprintf (stdout,
 			  "   -y Pixel height for main window (default : 768)\n");
-		  fprintf (stdout, "   -g Gui height (default : 66 | min : 20)\n");
+		  fprintf (stdout, "   -g Gui height (default : 51 | min : 20)\n");
 		  fprintf (stdout,
 			  "   -f Set Fullscreen mode (Press ESC or Q to quit)\n");
 		  fprintf (stdout,
@@ -133,11 +133,13 @@ main (int argc, char *argv[])
 		  break;
       case 'g':
 		  sscanf (argv[i], "-g%i", &menuH);
+		  stateH = screenH - 20;  // Recalculer stateH après changement de menuH
 		  break;
       case 'n':
 		  useGui = 0;
 		  menuH = 0;
 		  stateH = screenH;
+		  break;
       default:
 		  printf ("Unknown parameter : -%c", argv[i][1]);
 		  break;
@@ -185,8 +187,10 @@ main (int argc, char *argv[])
 	// On initialise le menu si useGui = TRUE
 	if (useGui)
 		g = SDLGUI_Init (0, 0, win.w, win.y1, stateH, SDL_MapRGB (screen->format, 213, 214, 213), 23);	// 23 boutons (types 1-23)
-	if (useGui)
+	if (useGui) {
+		g.selectedType = typeFractale;  // Initialiser avec le type par défaut
 		SDLGUI_Draw (screen, &g);
+	}
 	
 	// On initialise la fractale
 	f = Fractal_Init (win.w, win.y2-win.y1,typeFractale);
@@ -218,7 +222,7 @@ main (int argc, char *argv[])
 		EventFlush (&event);	// Event when Initializing
 		while (SDL_WaitEvent (&event) >= 0)
 		{
-			EventCheck (&event, screen, &g, &f, &typeFractale, &iteration, win, &renderTime);
+			EventCheck (&event, screen, (useGui ? &g : NULL), &f, &typeFractale, &iteration, win, &renderTime);
 		}
     }
 	return 1;			// Error, should never reach this line !
@@ -263,7 +267,7 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			}
 			if (event->key.keysym.sym == SDLK_s)
 			{			// Screenshot
-				if (SDL_SaveBMP (screen, "Screenshot.bmp") == 1)
+				if (SDL_SaveBMP (screen, "Screenshot.bmp") != 0)
 				{
 					printf ("Cannot save the screenshot in BMP file\n");
 				}
@@ -369,6 +373,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					}
 					centerX = (f->xmin + f->xmax) / 2;
 					centerY = (f->ymin + f->ymax) / 2;
+					if (g != NULL)
+						SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
 				}
 			}
 
@@ -376,6 +382,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			{
 				*typeFractale =1;
 				*iteration = 1;
+				if (g != NULL) g->selectedType = 1;
+				if (g != NULL) SDLGUI_Draw (screen, g);
 				VonKochDraw (screen,0,win.y1,win.w,win.y2, *iteration);	// Trace de Von koch
 			}
 
@@ -383,12 +391,16 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			{
 				*typeFractale =2;
 				*iteration = 4;
+				if (g != NULL) g->selectedType = 2;
+				if (g != NULL) SDLGUI_Draw (screen, g);
 				DragonFractDraw (screen,0,win.y1,win.w,win.y2, *iteration);	// Trace du Dragon
 			}
 
 			if (event->key.keysym.sym == SDLK_F3)
 			{
 				*typeFractale = 3;
+				if (g != NULL) g->selectedType = 3;
+				if (g != NULL) SDLGUI_Draw (screen, g);
 				Fractal_ChangeType (f, 3);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
@@ -397,6 +409,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			if (event->key.keysym.sym == SDLK_F4)
 			{
 				*typeFractale = 4;
+				if (g != NULL) g->selectedType = 4;
+				if (g != NULL) SDLGUI_Draw (screen, g);
 				Fractal_ChangeType (f, 4);
 				*renderTime = Fractal_Draw (screen, *f,0, win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
@@ -405,6 +419,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			if (event->key.keysym.sym == SDLK_F5)
 			{
 				*typeFractale = 5;
+				if (g != NULL) g->selectedType = 5;
+				if (g != NULL) SDLGUI_Draw (screen, g);
 				Fractal_ChangeType (f, 5);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
@@ -413,6 +429,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			if (event->key.keysym.sym == SDLK_F6)
 			{
 				*typeFractale = 6;
+				if (g != NULL) g->selectedType = 6;
+				if (g != NULL) SDLGUI_Draw (screen, g);
 				Fractal_ChangeType (f, 6);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
@@ -421,6 +439,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			if (event->key.keysym.sym == SDLK_F7)
 			{
 				*typeFractale = 7;
+				if (g != NULL) g->selectedType = 7;
+				if (g != NULL) SDLGUI_Draw (screen, g);
 				Fractal_ChangeType (f, 7);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
@@ -429,6 +449,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			if (event->key.keysym.sym == SDLK_F8)
 			{
 				*typeFractale = 8;
+				if (g != NULL) g->selectedType = 8;
+				if (g != NULL) SDLGUI_Draw (screen, g);
 				Fractal_ChangeType (f, 8);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
@@ -437,6 +459,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			if (event->key.keysym.sym == SDLK_F9)
 			{
 				*typeFractale = 13;
+				if (g != NULL) g->selectedType = 13;
+				if (g != NULL) SDLGUI_Draw (screen, g);
 				Fractal_ChangeType (f, 13);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
@@ -445,6 +469,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			if (event->key.keysym.sym == SDLK_F10)
 			{
 				*typeFractale = 14;
+				if (g != NULL) g->selectedType = 14;
+				if (g != NULL) SDLGUI_Draw (screen, g);
 				Fractal_ChangeType (f, 14);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
@@ -453,6 +479,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			if (event->key.keysym.sym == SDLK_F11)
 			{
 				*typeFractale = 15;
+				if (g != NULL) g->selectedType = 15;
+				if (g != NULL) SDLGUI_Draw (screen, g);
 				Fractal_ChangeType (f, 15);
 				*renderTime = Fractal_Draw (screen, *f, 0,win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
@@ -461,6 +489,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 			if (event->key.keysym.sym == SDLK_F12)
 			{
 				*typeFractale = 16;
+				if (g != NULL) g->selectedType = 16;
+				if (g != NULL) SDLGUI_Draw (screen, g);
 				Fractal_ChangeType (f, 16);
 				*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
 				centerX = (f->xmin + f->xmax) / 2; centerY = (f->ymin + f->ymax) / 2;
@@ -498,6 +528,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					int buttonNumber = SDLGUI_ButtonNumberRead (g, event->button.x);
 					printf ("GUI Event n %d Detected ...\n", buttonNumber);
 					*typeFractale = buttonNumber+1;
+					g->selectedType = *typeFractale;  // Mettre à jour le bouton sélectionné
+					SDLGUI_Draw (screen, g);  // Redessiner le GUI avec le nouveau cadre
 					switch (*typeFractale) {
 					case 1:
 					*typeFractale =1;
@@ -714,13 +746,19 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 							// Réallouer zmatrix_gmp si nécessaire
 							if (f->use_gmp) {
 								// Si zmatrix_gmp existe déjà, vérifier si la précision a changé
-								if (f->zmatrix_gmp != NULL && f->xpixel > 0 && f->ypixel > 0) {
-									// Vérifier si zmatrix_gmp[0] est initialisé avant d'accéder à sa précision
+								if (f->zmatrix_gmp != NULL && f->xpixel > 0 && f->ypixel > 0 && (f->xpixel * f->ypixel) > 0) {
+									// Vérifier si la précision actuelle diffère de celle attendue
+									// On lit la précision de l'élément [0] pour comparer
+									// Vérifier que l'élément est initialisé (précision > 0)
 									mp_bitcnt_t old_prec = 0;
-									// Essayer de lire la précision, si elle est 0, l'élément n'est pas initialisé
-									old_prec = mpf_get_prec(f->zmatrix_gmp[0].x);
-									if (old_prec == 0 || old_prec != f->gmp_precision) {
-										// Précision changée ou non initialisé : réallouer
+									if (mpf_get_prec(f->zmatrix_gmp[0].x) > 0) {
+										old_prec = mpf_get_prec(f->zmatrix_gmp[0].x);
+									}
+									// Réallouer si la précision a changé (comparaison robuste)
+									// Note: old_prec peut être 0 si non initialisé, mais la vraie vérification
+									// est la comparaison avec la précision attendue
+									if (old_prec != f->gmp_precision) {
+										// Précision changée : réallouer avec la nouvelle précision
 										for (int k = 0; k < f->xpixel * f->ypixel; k++) {
 											complex_gmp_clear(&f->zmatrix_gmp[k]);
 										}
@@ -801,11 +839,13 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 						// Réallouer zmatrix_gmp si nécessaire
 						if (f->use_gmp) {
 							// Si zmatrix_gmp existe déjà, vérifier si la précision a changé
-							if (f->zmatrix_gmp != NULL && f->xpixel > 0 && f->ypixel > 0) {
+							if (f->zmatrix_gmp != NULL && f->xpixel > 0 && f->ypixel > 0 && (f->xpixel * f->ypixel) > 0) {
 								// Vérifier si zmatrix_gmp[0] est initialisé avant d'accéder à sa précision
 								mp_bitcnt_t old_prec = 0;
 								// Essayer de lire la précision, si elle est 0, l'élément n'est pas initialisé
-								old_prec = mpf_get_prec(f->zmatrix_gmp[0].x);
+								if (mpf_get_prec(f->zmatrix_gmp[0].x) > 0) {
+									old_prec = mpf_get_prec(f->zmatrix_gmp[0].x);
+								}
 								if (old_prec == 0 || old_prec != f->gmp_precision) {
 									// Précision changée : réallouer
 									for (int k = 0; k < f->xpixel * f->ypixel; k++) {
@@ -959,13 +999,19 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 							// Réallouer zmatrix_gmp si nécessaire
 							if (f->use_gmp) {
 								// Si zmatrix_gmp existe déjà, vérifier si la précision a changé
-								if (f->zmatrix_gmp != NULL && f->xpixel > 0 && f->ypixel > 0) {
-									// Vérifier si zmatrix_gmp[0] est initialisé avant d'accéder à sa précision
+								if (f->zmatrix_gmp != NULL && f->xpixel > 0 && f->ypixel > 0 && (f->xpixel * f->ypixel) > 0) {
+									// Vérifier si la précision actuelle diffère de celle attendue
+									// On lit la précision de l'élément [0] pour comparer
+									// Vérifier que l'élément est initialisé (précision > 0)
 									mp_bitcnt_t old_prec = 0;
-									// Essayer de lire la précision, si elle est 0, l'élément n'est pas initialisé
-									old_prec = mpf_get_prec(f->zmatrix_gmp[0].x);
-									if (old_prec == 0 || old_prec != f->gmp_precision) {
-										// Précision changée ou non initialisé : réallouer
+									if (mpf_get_prec(f->zmatrix_gmp[0].x) > 0) {
+										old_prec = mpf_get_prec(f->zmatrix_gmp[0].x);
+									}
+									// Réallouer si la précision a changé (comparaison robuste)
+									// Note: old_prec peut être 0 si non initialisé, mais la vraie vérification
+									// est la comparaison avec la précision attendue
+									if (old_prec != f->gmp_precision) {
+										// Précision changée : réallouer avec la nouvelle précision
 										for (int k = 0; k < f->xpixel * f->ypixel; k++) {
 											complex_gmp_clear(&f->zmatrix_gmp[k]);
 										}
@@ -1046,11 +1092,13 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 						// Réallouer zmatrix_gmp si nécessaire
 						if (f->use_gmp) {
 							// Si zmatrix_gmp existe déjà, vérifier si la précision a changé
-							if (f->zmatrix_gmp != NULL && f->xpixel > 0 && f->ypixel > 0) {
+							if (f->zmatrix_gmp != NULL && f->xpixel > 0 && f->ypixel > 0 && (f->xpixel * f->ypixel) > 0) {
 								// Vérifier si zmatrix_gmp[0] est initialisé avant d'accéder à sa précision
 								mp_bitcnt_t old_prec = 0;
 								// Essayer de lire la précision, si elle est 0, l'élément n'est pas initialisé
-								old_prec = mpf_get_prec(f->zmatrix_gmp[0].x);
+								if (mpf_get_prec(f->zmatrix_gmp[0].x) > 0) {
+									old_prec = mpf_get_prec(f->zmatrix_gmp[0].x);
+								}
 								if (old_prec == 0 || old_prec != f->gmp_precision) {
 									// Précision changée : réallouer
 									for (int k = 0; k < f->xpixel * f->ypixel; k++) {

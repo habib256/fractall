@@ -26,6 +26,9 @@
 int precision_needs_gmp(fractal* f) {
     if (f == NULL) return 0;
     
+    // Protection contre division par zéro
+    if (f->xpixel <= 0 || f->ypixel <= 0) return 0;
+    
     double pixel_size_x, pixel_size_y;
     
     // Calcul de la taille d'un pixel en unités complexes
@@ -43,6 +46,9 @@ int precision_needs_gmp(fractal* f) {
 mp_bitcnt_t precision_calculate_gmp_bits(fractal* f) {
     if (f == NULL) return GMP_PREC_MIN;
     
+    // Protection contre division par zéro
+    if (f->xpixel <= 0 || f->ypixel <= 0) return GMP_PREC_MIN;
+    
     double pixel_size_x, pixel_size_y;
     double min_pixel_size;
     double zoom_factor;
@@ -56,6 +62,10 @@ mp_bitcnt_t precision_calculate_gmp_bits(fractal* f) {
     // Pour Mandelbrot standard: xmax-xmin ≈ 4.0
     // zoom_factor ≈ 4.0 / (xmax - xmin)
     double base_range = 4.0;
+    // Protection contre division par zéro
+    if (f->xmax - f->xmin <= 0.0) {
+        return GMP_PREC_MIN;
+    }
     zoom_factor = base_range / (f->xmax - f->xmin);
     
     // Précision basée sur le log2 du zoom

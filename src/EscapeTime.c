@@ -1082,8 +1082,15 @@ static void Fractal_CalculateMatrix_DDp2_GMP (fractal* f, SDL_Surface* canvas, v
 						*((f->fmatrix)+((f->xpixel*j)+i)) = up;
 
 						double rz, iz;
-						rz = (Rez(zup_local)+Rez(zdown_local)+Rez(zleft_local)+Rez(zright_local))/compteur;
-						iz = (Imz(zup_local)+Imz(zdown_local)+Imz(zleft_local)+Imz(zright_local))/compteur;
+						// Protection contre division par zéro (compteur devrait toujours être > 0 ici)
+						if (compteur > 0) {
+							rz = (Rez(zup_local)+Rez(zdown_local)+Rez(zleft_local)+Rez(zright_local))/compteur;
+							iz = (Imz(zup_local)+Imz(zdown_local)+Imz(zleft_local)+Imz(zright_local))/compteur;
+						} else {
+							// Cas de sécurité : utiliser la moyenne des valeurs disponibles
+							rz = (Rez(zup_local)+Rez(zdown_local)+Rez(zleft_local)+Rez(zright_local))/4.0;
+							iz = (Imz(zup_local)+Imz(zdown_local)+Imz(zleft_local)+Imz(zright_local))/4.0;
+						}
 						*((f->zmatrix)+((f->xpixel*j)+i)) = MakeComplex(rz, iz);
 						if (f->zmatrix_gmp != NULL) {
 							complex_to_gmp_inplace(&f->zmatrix_gmp[(f->xpixel*j)+i], *((f->zmatrix)+((f->xpixel*j)+i)), prec);
@@ -1209,8 +1216,15 @@ static void Fractal_CalculateMatrix_DDp2_GMP (fractal* f, SDL_Surface* canvas, v
 					*((f->fmatrix)+((f->xpixel*j)+i)) = up;
 
 					double rz, iz;
-					rz = (Rez(zup)+Rez(zdown)+Rez(zleft)+Rez(zright))/compteur;
-					iz = (Imz(zup)+Imz(zdown)+Imz(zleft)+Imz(zright))/compteur;
+					// Protection contre division par zéro (compteur devrait toujours être > 0 ici)
+					if (compteur > 0) {
+						rz = (Rez(zup)+Rez(zdown)+Rez(zleft)+Rez(zright))/compteur;
+						iz = (Imz(zup)+Imz(zdown)+Imz(zleft)+Imz(zright))/compteur;
+					} else {
+						// Cas de sécurité : utiliser la moyenne des valeurs disponibles
+						rz = (Rez(zup)+Rez(zdown)+Rez(zleft)+Rez(zright))/4.0;
+						iz = (Imz(zup)+Imz(zdown)+Imz(zleft)+Imz(zright))/4.0;
+					}
 					*((f->zmatrix)+((f->xpixel*j)+i)) = MakeComplex(rz, iz);
 					if (f->zmatrix_gmp != NULL) {
 						complex_to_gmp_inplace(&f->zmatrix_gmp[(f->xpixel*j)+i], *((f->zmatrix)+((f->xpixel*j)+i)), prec);
@@ -1572,8 +1586,18 @@ static void Fractal_SaveCache(fractal* f) {
 		}
 		f->cache.fmatrix_cached = (int*) malloc(f->xpixel * f->ypixel * sizeof(int));
 		f->cache.cmatrix_cached = (color*) malloc(f->xpixel * f->ypixel * sizeof(color));
+		// Vérifier chaque allocation individuellement pour éviter les fuites mémoire
 		if (f->cache.fmatrix_cached == NULL || f->cache.cmatrix_cached == NULL) {
 			fprintf(stderr, "Erreur allocation mémoire cache\n");
+			// Libérer celle qui a réussi si l'autre a échoué
+			if (f->cache.fmatrix_cached != NULL) {
+				free(f->cache.fmatrix_cached);
+				f->cache.fmatrix_cached = NULL;
+			}
+			if (f->cache.cmatrix_cached != NULL) {
+				free(f->cache.cmatrix_cached);
+				f->cache.cmatrix_cached = NULL;
+			}
 			return;
 		}
 		f->cache.cache_xpixel = f->xpixel;
@@ -1603,6 +1627,11 @@ static int Fractal_CanReuseCache(fractal* f) {
 	double old_range_y = f->cache.ymax_cached - f->cache.ymin_cached;
 	double new_range_x = f->xmax - f->xmin;
 	double new_range_y = f->ymax - f->ymin;
+	
+	// Protection contre division par zéro
+	if (new_range_x <= 0.0 || old_range_x <= 0.0) {
+		return 0;  // Cache non réutilisable
+	}
 	
 	double zoom_factor = old_range_x / new_range_x;
 	
@@ -2767,8 +2796,13 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 				}
 			}
 
-			free(trajX);
-			free(trajY);
+			// Libérer seulement les allocations qui ont réussi
+			if (trajX != NULL) {
+				free(trajX);
+			}
+			if (trajY != NULL) {
+				free(trajY);
+			}
 		} // Fin région parallèle pour ce chunk
 		
 		// Après chaque chunk : normaliser, coloriser et afficher progressivement

@@ -3,8 +3,8 @@
 Visualiseur de fractales portable en C utilisant SDL.
 
 **Licence** : GPL-2.0
-**Auteur** : Arnaud VERHILLE (2001-200)
-**Version** : 1.0
+**Auteur** : Arnaud VERHILLE (2001-2003)
+**Version** : 0.5
 
 ## Compilation
 
@@ -66,7 +66,7 @@ fractall [OPTIONS]
 | **Clic gauche** | Zoom / +1 itération (vectorielles) |
 | **Clic droit** | Dézoom / -1 itération |
 | **C** | Changer palette |
-| **R** | Changer nombre de répétitions du gradient (2, 4, 6, 8, 10, 12, 14, 16, 18, 20) |
+| **R** | Changer nombre de répétitions du gradient (2, 4, 6, 8, 10, 12, 14, 16, 18, 20) - Par défaut : 20 pour escape-time, 2 pour Lyapunov |
 | **S** | Screenshot (Screenshot.bmp) |
 | **Q/ESC** | Quitter |
 
@@ -77,8 +77,8 @@ fractall [OPTIONS]
 ```
 src/
 ├── main.c           # Point d'entrée, événements
-├── EscapeTime.[ch]  # Fractales escape-time (18 types)
-├── colorization.[ch] # Système unifié de colorisation (8 palettes)
+├── EscapeTime.[ch]  # Fractales escape-time (23 types)
+├── colorization.[ch] # Système unifié de colorisation (9 palettes)
 ├── color_types.h    # Type color unifié
 ├── VonKoch.[ch]     # Fractales vectorielles
 ├── SDLGUI.[ch]      # Interface graphique
@@ -86,6 +86,7 @@ src/
 ├── complexmath_gmp.[ch] # Arithmétique GMP (optionnel)
 ├── complexmath_simd.c   # Arithmétique SIMD (SSE4.1/AVX)
 ├── precision_detector.[ch] # Détection précision GMP
+├── gmp_pool.[ch]    # Pool de mémoire GMP pour optimisations
 └── SDL_gfx*         # Primitives graphiques
 ```
 
@@ -170,14 +171,23 @@ Algorithme basé sur l'exposant de Lyapunov de la suite logistique x_{n+1} = r_n
 
 Toutes utilisent une interpolation continue basée sur des tables de gradient et alternent endroit/envers pour éviter les transitions brutales.
 
-**Note** : Buddhabrot et Lyapunov supportent maintenant toutes les 8 palettes disponibles (touche C).
+**Note** : Buddhabrot et Lyapunov supportent maintenant toutes les 9 palettes disponibles (touche C).
 
 ## Structure principale
 
 ### `fractal` (EscapeTime.h)
 
 ```c
+// Structure de cache pour réutilisation lors de zooms
 typedef struct {
+  double xmin_cached, xmax_cached, ymin_cached, ymax_cached;
+  int* fmatrix_cached;
+  color* cmatrix_cached;
+  int cache_valid;
+  int cache_xpixel, cache_ypixel;  // Dimensions du cache
+} fractal_cache;
+
+typedef struct fractal_struct {
   int xpixel, ypixel;       // Dimensions en pixels
   double xmin, xmax;        // Bornes du plan complexe
   double ymin, ymax;
@@ -185,20 +195,36 @@ typedef struct {
   int iterationMax;         // Limite d'itérations
   int bailout;              // Seuil d'échappement (généralement 4)
   int zoomfactor;           // Facteur de zoom (2-8 selon fractale)
-  int type;                 // Type de fractale (1-17)
+  int type;                 // Type de fractale (1-23)
   int colorMode;            // 0=SmoothFire, 1=SmoothOcean, 2=SmoothForest, 3=SmoothViolet, 4=SmoothRainbow, 5=SmoothSunset, 6=SmoothPlasma (défaut), 7=SmoothIce, 8=SmoothCosmic
-  int *fmatrix;             // Matrice d'itérations
-  complex *zmatrix;         // Valeurs z finales
-  color *cmatrix;           // Couleurs calculées
+  int cmatrix_valid;        // 1 si cmatrix est valide pour le colorMode actuel
+  int last_colorMode;       // colorMode lors du dernier calcul de cmatrix
+  int colorRepeat;           // Nombre de répétitions du gradient (2-20, de 2 en 2)
+  int last_colorRepeat;      // colorRepeat lors du dernier calcul de cmatrix
+  double zoom_level;         // Niveau de zoom actuel pour détection de changement
+  int *fmatrix;              // Matrice d'itérations
+  complex *zmatrix;          // Valeurs z finales
+  color *cmatrix;            // Couleurs calculées
+  fractal_cache cache;       // Cache pour réutilisation lors de zooms
 #ifdef HAVE_GMP
-  int use_gmp;              // Utiliser GMP (1) ou double (0)
+  int use_gmp;               // Utiliser GMP (1) ou double (0)
   mp_bitcnt_t gmp_precision; // Précision GMP en bits
-  complex_gmp *zmatrix_gmp; // Matrice GMP optionnelle
-  mpf_t xmin_gmp, xmax_gmp; // Coordonnées GMP
+  complex_gmp *zmatrix_gmp;  // Matrice GMP optionnelle
+  mpf_t xmin_gmp, xmax_gmp;  // Coordonnées GMP
   mpf_t ymin_gmp, ymax_gmp;
+  gmp_iteration_context iteration_ctx;  // Contexte pré-alloué pour itérations
+  gmp_mul_temps mul_temps;    // Temporaires de multiplication pré-alloués
 #endif
 } fractal;
 ```
+
+**Notes importantes** :
+- Le système de cache (`fractal_cache`) permet de réutiliser les calculs lors de zooms successifs pour améliorer les performances
+- `cmatrix_valid` et `last_colorMode`/`last_colorRepeat` permettent d'éviter le recalcul de la colorisation si seule la palette ou les répétitions changent
+- `colorRepeat` : nombre de répétitions du gradient (2, 4, 6, 8, 10, 12, 14, 16, 18, 20) - modifiable avec la touche **R**
+  - Valeur par défaut : **20** pour les fractales escape-time (types 3-16, 18-23)
+  - Valeur par défaut : **2** pour Lyapunov (type 17)
+- Avec GMP, `iteration_ctx` et `mul_temps` sont des structures pré-allouées pour optimiser les allocations mémoire lors des itérations
 
 ## Optimisation du rendu
 
@@ -233,9 +259,15 @@ La détection des instructions SIMD est automatique à la compilation.
 
 Avec `--with-gmp`, le programme détecte automatiquement quand la précision double (53 bits) devient insuffisante et bascule vers GMP. La précision augmente dynamiquement avec le niveau de zoom.
 
+**Optimisations GMP** :
+- Pool de mémoire (`gmp_pool.[ch]`) : réutilisation de structures GMP pré-allouées pour réduire les allocations
+- Contexte d'itération (`gmp_iteration_context`) : variables temporaires pré-allouées pour chaque itération
+- Temporaires de multiplication (`gmp_mul_temps`) : structures optimisées pour les multiplications complexes
+
 Fichiers clés :
-- `precision_detector.[ch]` : Détection automatique du seuil
+- `precision_detector.[ch]` : Détection automatique du seuil de précision
 - `complexmath_gmp.[ch]` : Arithmétique complexe en précision arbitraire
+- `gmp_pool.[ch]` : Système de pool de mémoire pour optimiser les allocations GMP
 
 ## Barre d'état
 
@@ -296,11 +328,6 @@ Un plan de recherche détaillé est disponible dans **PLAN_RECHERCHE_FRACTALES.m
 6. **Multibrot (puissances non-entières)** (Type 23) ✅ - Morphing entre formes
    - Formule : `z(n+1) = z^d + c` (d réel, ex: 2.5)
    - Complexité : ⭐⭐ Moyenne (gestion branch cuts)
-   - Complexité : ⭐⭐ Moyenne (dérivée polynomiale)
-
-6. **Multibrot (puissances non-entières)** - Morphing entre formes
-   - Formule : `z(n+1) = z(n)^d + c` où d est réel (2.5, 3.7, etc.)
-   - Complexité : ⭐⭐ Moyenne (gestion branch cuts)
 
 #### Priorité BASSE (nécessitent modifications architecturales)
 7. **Fractales 3D/Quaternions** - Mandelbox, Quaternion Julia
@@ -331,9 +358,10 @@ Voir **PLAN_RECHERCHE_FRACTALES.md** pour le plan détaillé de recherche et d'i
 ### État actuel
 
 Le GUI actuel (`SDLGUI.c`) est minimaliste :
-- Barre de 17 boutons carrés avec aperçu miniature de chaque fractale
+- Barre de 23 boutons carrés avec aperçu miniature de chaque fractale (types 1-23)
 - Barre de défilement horizontale (car tous les boutons ne rentrent pas)
 - Barre d'état en bas affichant : Type | Palette | Zoom | Centre | Temps
+- Structure `gui` contient `selectedType` (type actuellement sélectionné) et `hoverButton` (bouton survolé)
 
 ### Améliorations proposées
 

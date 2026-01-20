@@ -32,6 +32,8 @@ typedef struct gui_struct {   // barre de boutton
   int barh,barw;     // Largeur de la barre de deplacement
   int selectedType;  // Type de fractale actuellement sélectionné (1-23)
   int hoverButton;   // Bouton survolé (-1 si aucun)
+  SDL_Surface** buttonCache;  // Tableau de surfaces en cache (une par bouton, 23 au total)
+  int* buttonCacheValid;       // Tableau de flags (1 = cache valide, 0 = invalide)
 } gui;
 
 extern gui SDLGUI_Init (int, int, int, int, int, Uint32, int);
