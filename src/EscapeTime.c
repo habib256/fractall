@@ -3803,12 +3803,510 @@ fractalresult FormulaSelector_GMP (fractal f, complex_gmp zPixel) {
 	case 15:
 		r = Mandelbulb_Iteration_GMP(f, zPixel);
 		break;
+	case 18:
+		r = PerpendicularBurningShip_Iteration_GMP(f, zPixel);
+		break;
+	case 19:
+		r = Celtic_Iteration_GMP(f, zPixel);
+		break;
+	case 20:
+		r = AlphaMandelbrot_Iteration_GMP(f, zPixel);
+		break;
+	case 21:
+		r = PickoverStalks_Iteration_GMP(f, zPixel);
+		break;
+	case 22:
+		r = Nova_Iteration_GMP(f, zPixel);
+		break;
+	case 23:
+		r = Multibrot_Iteration_GMP(f, zPixel);
+		break;
 	default:
 		r = Mendelbrot_Iteration_GMP(f, zPixel);
 		break;
 	}
 	
-	return r;
+		return r;
+}
+
+/* Versions GMP pour les fractales complexes (types 18-23) */
+
+fractalresult PerpendicularBurningShip_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, zTemp;
+	mpf_t mag2, bailout_mpf, temp1, temp2, x, y, y_abs, x2, y2, x_new, y_new;
+	fractalresult result;
+
+	mp_bitcnt_t prec = f.gmp_precision;
+	complex_gmp seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(seed_gmp, prec);
+	complex_gmp_init(&zTemp, prec);
+
+	mpf_init2(mag2, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(temp1, prec);
+	mpf_init2(temp2, prec);
+	mpf_init2(x, prec);
+	mpf_init2(y, prec);
+	mpf_init2(y_abs, prec);
+	mpf_init2(x2, prec);
+	mpf_init2(y2, prec);
+	mpf_init2(x_new, prec);
+	mpf_init2(y_new, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	mpf_mul(bailout_mpf, bailout_mpf, bailout_mpf);  // bailout²
+
+	do {
+		i++;
+		// z(n+1) = (Re(z) - i·|Im(z)|)² + c
+		mpf_set(x, z.x);
+		mpf_set(y, z.y);
+		mpf_abs(y_abs, y);
+		
+		// Calcul de (x - i·y_abs)² = x² - y_abs² - i·2·x·y_abs
+		mpf_mul(x2, x, x);
+		mpf_mul(y2, y_abs, y_abs);
+		mpf_sub(x_new, x2, y2);
+		mpf_add(x_new, x_new, zPixel.x);
+		
+		mpf_mul(y_new, x, y_abs);
+		mpf_mul_ui(y_new, y_new, 2);
+		mpf_neg(y_new, y_new);
+		mpf_add(y_new, y_new, zPixel.y);
+		
+		mpf_set(z.x, x_new);
+		mpf_set(z.y, y_new);
+		complex_gmp_mag2_to(mag2, z, temp1, temp2);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag2, bailout_mpf) < 0));
+
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&zTemp);
+	complex_gmp_clear(&seed_gmp);
+	mpf_clear(mag2);
+	mpf_clear(bailout_mpf);
+	mpf_clear(temp1);
+	mpf_clear(temp2);
+	mpf_clear(x);
+	mpf_clear(y);
+	mpf_clear(y_abs);
+	mpf_clear(x2);
+	mpf_clear(y2);
+	mpf_clear(x_new);
+	mpf_clear(y_new);
+
+	return result;
+}
+
+fractalresult Celtic_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, zSq;
+	mpf_t mag2, bailout_mpf, temp1, temp2, u, u_abs;
+	fractalresult result;
+
+	mp_bitcnt_t prec = f.gmp_precision;
+	complex_gmp seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(seed_gmp, prec);
+	complex_gmp_init(&zSq, prec);
+
+	mpf_init2(mag2, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(temp1, prec);
+	mpf_init2(temp2, prec);
+	mpf_init2(u, prec);
+	mpf_init2(u_abs, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	mpf_mul(bailout_mpf, bailout_mpf, bailout_mpf);  // bailout²
+
+	do {
+		i++;
+		// Calcul de z² = (x + iy)² = (x² - y²) + i(2xy)
+		complex_gmp_sq_to(&zSq, z, &f.mul_temps);
+		
+		// u = partie réelle de z², v = partie imaginaire de z²
+		// Appliquer abs() à la partie réelle
+		mpf_abs(u_abs, zSq.x);
+		mpf_add(z.x, u_abs, zPixel.x);
+		mpf_add(z.y, zSq.y, zPixel.y);
+		
+		complex_gmp_mag2_to(mag2, z, temp1, temp2);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag2, bailout_mpf) < 0));
+
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&zSq);
+	complex_gmp_clear(&seed_gmp);
+	mpf_clear(mag2);
+	mpf_clear(bailout_mpf);
+	mpf_clear(temp1);
+	mpf_clear(temp2);
+	mpf_clear(u);
+	mpf_clear(u_abs);
+
+	return result;
+}
+
+fractalresult AlphaMandelbrot_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, zSq, m, mSq, zTemp;
+	mpf_t mag2, bailout_mpf, temp1, temp2;
+	fractalresult result;
+
+	mp_bitcnt_t prec = f.gmp_precision;
+	complex_gmp seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(seed_gmp, prec);
+	complex_gmp_init(&zSq, prec);
+	complex_gmp_init(&m, prec);
+	complex_gmp_init(&mSq, prec);
+	complex_gmp_init(&zTemp, prec);
+
+	mpf_init2(mag2, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(temp1, prec);
+	mpf_init2(temp2, prec);
+	mpf_set_ui(bailout_mpf, f.bailout);
+	mpf_mul(bailout_mpf, bailout_mpf, bailout_mpf);  // bailout²
+
+	do {
+		i++;
+		// Calcul de z²
+		complex_gmp_sq_to(&zSq, z, &f.mul_temps);
+		// Calcul de m = z² + c
+		complex_gmp_add_to(&m, zSq, zPixel);
+		// Calcul de m²
+		complex_gmp_sq_to(&mSq, m, &f.mul_temps);
+		// z_{n+1} = z² + m² + c
+		complex_gmp_add_to(&zTemp, zSq, mSq);
+		complex_gmp_add_to(&z, zTemp, zPixel);
+		complex_gmp_mag2_to(mag2, z, temp1, temp2);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag2, bailout_mpf) < 0));
+
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&zSq);
+	complex_gmp_clear(&m);
+	complex_gmp_clear(&mSq);
+	complex_gmp_clear(&zTemp);
+	complex_gmp_clear(&seed_gmp);
+	mpf_clear(mag2);
+	mpf_clear(bailout_mpf);
+	mpf_clear(temp1);
+	mpf_clear(temp2);
+
+	return result;
+}
+
+fractalresult PickoverStalks_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, zTemp;
+	mpf_t mag2, bailout_mpf, temp1, temp2, re_abs, im_abs, trap_distance, trap_min, log_trap, trap_divisor;
+	fractalresult result;
+
+	mp_bitcnt_t prec = f.gmp_precision;
+	complex_gmp seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(seed_gmp, prec);
+	complex_gmp_init(&zTemp, prec);
+
+	mpf_init2(mag2, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(temp1, prec);
+	mpf_init2(temp2, prec);
+	mpf_init2(re_abs, prec);
+	mpf_init2(im_abs, prec);
+	mpf_init2(trap_distance, prec);
+	mpf_init2(trap_min, prec);
+	mpf_init2(trap_divisor, prec);
+	
+	mpf_set_ui(bailout_mpf, f.bailout);
+	mpf_mul(bailout_mpf, bailout_mpf, bailout_mpf);  // bailout²
+	mpf_set_d(trap_divisor, 0.03);  // Ajuste l'épaisseur des stalks
+	mpf_set_d(trap_min, 1e10);  // Valeur initiale très grande
+
+	do {
+		i++;
+		// Itération Mandelbrot: z(n+1) = z² + c
+		complex_gmp_sq_to(&zTemp, z, &f.mul_temps);
+		complex_gmp_add_to(&z, zTemp, zPixel);
+		
+		// Calcul de la distance au trap (cross: axes Re=0 et Im=0)
+		mpf_abs(re_abs, z.x);
+		mpf_abs(im_abs, z.y);
+		if (mpf_cmp(re_abs, im_abs) < 0) {
+			mpf_set(trap_distance, re_abs);
+		} else {
+			mpf_set(trap_distance, im_abs);
+		}
+		
+		// Mise à jour de trap_min
+		if (mpf_cmp(trap_distance, trap_min) < 0) {
+			mpf_set(trap_min, trap_distance);
+		}
+		
+		complex_gmp_mag2_to(mag2, z, temp1, temp2);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag2, bailout_mpf) < 0));
+
+	// Stocker une valeur normalisée basée sur trap_min dans iteration
+	// Utiliser -log(trap_min) pour créer l'effet de coloration souhaité
+	mpf_t threshold, ratio;
+	mpf_init2(threshold, prec);
+	mpf_init2(ratio, prec);
+	mpf_set_d(threshold, 1e-10);
+	
+	if (mpf_cmp(trap_min, threshold) > 0) {
+		// log_trap = -log(trap_min / trap_divisor)
+		// Utiliser conversion double pour log (GMP n'a pas mpf_log)
+		mpf_div(ratio, trap_min, trap_divisor);
+		double ratio_d = mpf_get_d(ratio);
+		double log_val = -log(ratio_d) * 100.0;  // Normaliser
+		result.iteration = (int)log_val;
+		if (result.iteration < 0) result.iteration = 0;
+		if (result.iteration >= f.iterationMax) result.iteration = f.iterationMax - 1;
+	} else {
+		// trap_min très petit, point très proche des axes
+		result.iteration = f.iterationMax - 1;
+	}
+	
+	result.z = gmp_to_complex(z);
+
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&zTemp);
+	complex_gmp_clear(&seed_gmp);
+	mpf_clear(mag2);
+	mpf_clear(bailout_mpf);
+	mpf_clear(temp1);
+	mpf_clear(temp2);
+	mpf_clear(re_abs);
+	mpf_clear(im_abs);
+	mpf_clear(trap_distance);
+	mpf_clear(trap_min);
+	mpf_clear(trap_divisor);
+	mpf_clear(threshold);
+	mpf_clear(ratio);
+
+	return result;
+}
+
+fractalresult Nova_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, z_prev, z_pow, z_pow_deriv, numerator, denominator, newton_step, a_relax, one, p_val;
+	mpf_t mag, bailout_mpf, conv_epsilon, conv_epsilon_sq, diff_sq, z_sq, denom, p_mpf, zero_mpf, a_real;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	
+	// Paramètres
+	int p = 3;  // Exposant polynomial (cubique par défaut)
+	double conv_epsilon_d = 1e-7;
+	
+	mpf_init2(mag, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(conv_epsilon, prec);
+	mpf_init2(conv_epsilon_sq, prec);
+	mpf_init2(diff_sq, prec);
+	mpf_init2(z_sq, prec);
+	mpf_init2(denom, prec);
+	mpf_init2(p_mpf, prec);
+	mpf_init2(zero_mpf, prec);
+	mpf_init2(a_real, prec);
+	
+	mpf_set_ui(bailout_mpf, f.bailout);
+	mpf_set_d(conv_epsilon, conv_epsilon_d);
+	mpf_mul(conv_epsilon_sq, conv_epsilon, conv_epsilon);
+	mpf_set_ui(zero_mpf, 0);
+	mpf_set_d(p_mpf, (double)p);
+	mpf_set_d(a_real, 1.0);  // Paramètre de relaxation
+	
+	// Pour Nova en mode Mandelbrot, utiliser z0 = 1 (racine de z^3 - 1 = 0)
+	one = complex_gmp_one(prec);
+	z = complex_gmp_copy(one, prec);
+	z_prev = complex_gmp_copy(z, prec);
+	a_relax = complex_gmp_make(a_real, zero_mpf, prec);
+	p_val = complex_gmp_make(p_mpf, zero_mpf, prec);
+	
+	complex_gmp_init(&z_pow, prec);
+	complex_gmp_init(&z_pow_deriv, prec);
+	complex_gmp_init(&numerator, prec);
+	complex_gmp_init(&denominator, prec);
+	complex_gmp_init(&newton_step, prec);
+	
+	do {
+		mpf_t p_minus_one_mpf;
+		mpf_init2(p_minus_one_mpf, prec);
+		mpf_sub_ui(p_minus_one_mpf, p_mpf, 1);
+		complex_gmp p_minus_one_val = complex_gmp_make(p_minus_one_mpf, zero_mpf, prec);
+		
+		i++;
+		
+		// Libérer les anciennes valeurs avant de réassigner
+		complex_gmp_clear(&z_pow);
+		complex_gmp_clear(&z_pow_deriv);
+		complex_gmp_clear(&numerator);
+		complex_gmp_clear(&denominator);
+		complex_gmp_clear(&newton_step);
+		
+		// Calcul de z^p
+		z_pow = complex_gmp_pow_n(z, p_val, 0, prec);
+		// Calcul de z^(p-1)
+		z_pow_deriv = complex_gmp_pow_n(z, p_minus_one_val, 0, prec);
+		
+		// p(z) = z^p - 1
+		numerator = complex_gmp_sub(z_pow, one, prec);
+		// p'(z) = p·z^(p-1)
+		denominator = complex_gmp_mul(p_val, z_pow_deriv, prec);
+		
+		// Éviter division par zéro
+		complex_gmp_mag(mag, denominator);
+		if (mpf_cmp_d(mag, 1e-10) < 0) {
+			complex_gmp_clear(&p_minus_one_val);
+			mpf_clear(p_minus_one_mpf);
+			break;
+		}
+		
+		// Newton step: p(z)/p'(z)
+		newton_step = complex_gmp_div(numerator, denominator, prec);
+		// Multiplier par a (relaxation)
+		complex_gmp old_newton = newton_step;
+		newton_step = complex_gmp_mul(a_relax, newton_step, prec);
+		complex_gmp_clear(&old_newton);
+		
+		// z(n+1) = z - a·(p(z)/p'(z)) + c
+		complex_gmp_clear(&z_prev);
+		z_prev = complex_gmp_copy(z, prec);
+		complex_gmp old_z = z;
+		z = complex_gmp_sub(z, newton_step, prec);
+		complex_gmp_clear(&old_z);
+		complex_gmp old_z2 = z;
+		z = complex_gmp_add(z, zPixel, prec);
+		complex_gmp_clear(&old_z2);
+		
+		// Détection de convergence : |z_{n+1} - z_n| devient très petit
+		complex_gmp diff = complex_gmp_sub(z, z_prev, prec);
+		complex_gmp_mag2(diff_sq, diff);
+		complex_gmp_mag2(z_sq, z);
+		if (mpf_cmp_d(z_sq, 1.0) < 0) {
+			mpf_set_ui(denom, 1);
+		} else {
+			mpf_set(denom, z_sq);
+		}
+		
+		mpf_div(diff_sq, diff_sq, denom);
+		if (mpf_cmp(diff_sq, conv_epsilon_sq) < 0) {
+			// Convergence détectée vers une racine
+			complex_gmp_clear(&diff);
+			complex_gmp_clear(&p_minus_one_val);
+			mpf_clear(p_minus_one_mpf);
+			break;
+		}
+		complex_gmp_clear(&diff);
+		
+		// Échappement si |z| devient trop grand
+		complex_gmp_mag(mag, z);
+		if (mpf_cmp(mag, bailout_mpf) > 0) {
+			complex_gmp_clear(&p_minus_one_val);
+			mpf_clear(p_minus_one_mpf);
+			break;
+		}
+		
+		complex_gmp_clear(&p_minus_one_val);
+		mpf_clear(p_minus_one_mpf);
+	} while (i < f.iterationMax);
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&z_prev);
+	complex_gmp_clear(&z_pow);
+	complex_gmp_clear(&z_pow_deriv);
+	complex_gmp_clear(&numerator);
+	complex_gmp_clear(&denominator);
+	complex_gmp_clear(&newton_step);
+	complex_gmp_clear(&a_relax);
+	complex_gmp_clear(&one);
+	complex_gmp_clear(&p_val);
+	mpf_clear(mag);
+	mpf_clear(bailout_mpf);
+	mpf_clear(conv_epsilon);
+	mpf_clear(conv_epsilon_sq);
+	mpf_clear(diff_sq);
+	mpf_clear(z_sq);
+	mpf_clear(denom);
+	mpf_clear(p_mpf);
+	mpf_clear(zero_mpf);
+	mpf_clear(a_real);
+	
+	return result;
+}
+
+fractalresult Multibrot_Iteration_GMP (fractal f, complex_gmp zPixel) {
+	int i = 0;
+	complex_gmp z, z_pow, d_val;
+	mpf_t mag2, bailout_mpf, temp1, temp2, d_mpf, zero_mpf;
+	fractalresult result;
+	
+	mp_bitcnt_t prec = f.gmp_precision;
+	double d = 2.5;  // Exposant non-entier (exemple: morphing entre 2 et 3)
+	
+	complex_gmp seed_gmp = complex_to_gmp(f.seed, prec);
+	z = complex_gmp_copy(seed_gmp, prec);
+	complex_gmp_init(&z_pow, prec);
+	
+	mpf_init2(mag2, prec);
+	mpf_init2(bailout_mpf, prec);
+	mpf_init2(temp1, prec);
+	mpf_init2(temp2, prec);
+	mpf_init2(d_mpf, prec);
+	mpf_init2(zero_mpf, prec);
+	
+	mpf_set_ui(bailout_mpf, f.bailout);
+	mpf_mul(bailout_mpf, bailout_mpf, bailout_mpf);  // bailout²
+	mpf_set_d(d_mpf, d);
+	mpf_set_ui(zero_mpf, 0);
+	d_val = complex_gmp_make(d_mpf, zero_mpf, prec);
+	
+	do {
+		i++;
+		
+		// Calcul de z^d via exponentiation complexe
+		// z^d = exp(d·log(z))
+		// Utilise la branche principale automatiquement via complex_gmp_pow
+		z_pow = complex_gmp_pow(z, d_val, prec);
+		
+		// Vérifier si le résultat est valide (NaN ou Inf)
+		if (complex_gmp_is_nan(z_pow) || complex_gmp_is_inf(z_pow)) {
+			break;
+		}
+		
+		// z(n+1) = z^d + c
+		complex_gmp old_z = z;
+		z = complex_gmp_add(z_pow, zPixel, prec);
+		complex_gmp_clear(&old_z);
+		complex_gmp_clear(&z_pow);
+		
+		complex_gmp_mag2_to(mag2, z, temp1, temp2);
+	} while ((i < f.iterationMax) && (mpf_cmp(mag2, bailout_mpf) < 0));
+	
+	result.iteration = i;
+	result.z = gmp_to_complex(z);
+	
+	complex_gmp_clear(&z);
+	complex_gmp_clear(&z_pow);
+	complex_gmp_clear(&seed_gmp);
+	complex_gmp_clear(&d_val);
+	mpf_clear(mag2);
+	mpf_clear(bailout_mpf);
+	mpf_clear(temp1);
+	mpf_clear(temp2);
+	mpf_clear(d_mpf);
+	mpf_clear(zero_mpf);
+	
+	return result;
 }
 
 #endif /* HAVE_GMP */
