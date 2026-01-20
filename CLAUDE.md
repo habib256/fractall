@@ -39,8 +39,8 @@ fractall [OPTIONS]
 
 | Option | Description | Défaut |
 |--------|-------------|--------|
-| `-x<n>` | Largeur fenêtre | 800 |
-| `-y<n>` | Hauteur fenêtre | 600 |
+| `-x<n>` | Largeur fenêtre | 1024 |
+| `-y<n>` | Hauteur fenêtre | 768 |
 | `-f` | Plein écran | - |
 | `-g<n>` | Hauteur GUI | 51 |
 | `-nogui` | Sans interface | - |
@@ -62,7 +62,7 @@ fractall [OPTIONS]
 | **F10** | Tricorn |
 | **F11** | Mandelbulb |
 | **F12** | Buddhabrot |
-| **GUI** | 20 boutons pour sélectionner toutes les fractales (types 1-20) |
+| **GUI** | 23 boutons pour sélectionner toutes les fractales (types 1-23) |
 | **Clic gauche** | Zoom / +1 itération (vectorielles) |
 | **Clic droit** | Dézoom / -1 itération |
 | **C** | Changer palette |
@@ -70,7 +70,7 @@ fractall [OPTIONS]
 | **S** | Screenshot (Screenshot.bmp) |
 | **Q/ESC** | Quitter |
 
-**Note** : Les types 9-12 (Barnsley, Magnet), 17 (Lyapunov) et 18-20 (Perpendicular Burning Ship, Celtic, Alpha Mandelbrot) sont accessibles uniquement via les boutons GUI.
+**Note** : Les types 9-12 (Barnsley, Magnet), 17 (Lyapunov) et 18-23 (Perpendicular Burning Ship, Celtic, Alpha Mandelbrot, Pickover Stalks, Nova, Multibrot) sont accessibles uniquement via les boutons GUI.
 
 ## Architecture
 
@@ -98,7 +98,7 @@ src/
 | 1 | Von Koch | 8 |
 | 2 | Dragon | 20 |
 
-### Escape-time - Types 3-20
+### Escape-time - Types 3-23
 
 | Type | Nom | Formule |
 |------|-----|---------|
@@ -120,6 +120,9 @@ src/
 | 18 | Perpendicular Burning Ship | z(n+1) = (Re(z) - i×\|Im(z)\|)² + c |
 | 19 | Celtic | z(n+1) = \|Re(z²)\| + i×Im(z²) + c |
 | 20 | Alpha Mandelbrot | z(n+1) = z² + (z² + c)² + c |
+| 21 | Pickover Stalks | z(n+1) = z² + c avec orbit trap min(\|Re(z)\|, \|Im(z)\|) |
+| 22 | Nova | z(n+1) = z - a·(p(z)/p'(z)) + c (p(z) = z³ - 1) |
+| 23 | Multibrot | z(n+1) = z^d + c (d réel non-entier, ex: 2.5) |
 
 ### Buffalo (Type 8)
 
@@ -280,13 +283,18 @@ Un plan de recherche détaillé est disponible dans **PLAN_RECHERCHE_FRACTALES.m
    - Formule : `z(n+1) = z² + (z² + c)² + c`
    - Complexité : ⭐ Faible
 
-#### Priorité MOYENNE (intéressantes mais plus complexes)
-4. **Pickover Stalks / Biomorphs** - Formes biologiques/organiques
-   - Formule : `z(n+1) = sin(z) + exp(z) + c` avec orbit trap
+#### Priorité MOYENNE (intéressantes mais plus complexes) ✅ COMPLÉTÉ
+4. **Pickover Stalks / Biomorphs** (Type 21) ✅ - Formes biologiques/organiques
+   - Formule : `z(n+1) = z² + c` avec orbit trap `min(|Re(z)|, |Im(z)|)`
    - Complexité : ⭐⭐ Moyenne (système d'orbit trap)
 
-5. **Nova Fractal** - Variante Newton avec spirales élégantes
-   - Formule : `z(n+1) = z - a×p(z)/p'(z) + c`
+5. **Nova Fractal** (Type 22) ✅ - Variante Newton avec spirales élégantes
+   - Formule : `z(n+1) = z - a·(p(z)/p'(z)) + c` (p(z) = z³ - 1)
+   - Complexité : ⭐⭐ Moyenne (dérivée polynomiale)
+
+6. **Multibrot (puissances non-entières)** (Type 23) ✅ - Morphing entre formes
+   - Formule : `z(n+1) = z^d + c` (d réel, ex: 2.5)
+   - Complexité : ⭐⭐ Moyenne (gestion branch cuts)
    - Complexité : ⭐⭐ Moyenne (dérivée polynomiale)
 
 6. **Multibrot (puissances non-entières)** - Morphing entre formes
@@ -309,11 +317,11 @@ Voir **PLAN_RECHERCHE_FRACTALES.md** pour le plan détaillé de recherche et d'i
 ## Notes
 
 - GUI : 51px en haut, barre d'état : 20px en bas
-- 20 boutons dans le GUI (types 1-20)
+- 23 boutons dans le GUI (types 1-23)
 - `Buddhabrot_Draw()` pour le type 16 (algorithme de densité)
 - `Lyapunov_Draw()` pour le type 17 (algorithme d'exposant de Lyapunov - Zircon City)
 - `Fractal_Draw()` détecte automatiquement les types 16-17 et appelle leurs fonctions spécialisées
-- `Fractal_GetTypeName()` retourne le nom selon le type (0-20)
+- `Fractal_GetTypeName()` retourne le nom selon le type (0-23)
 - OpenMP : `HAVE_OPENMP` défini dans `config.h` si disponible
 - SIMD : `HAVE_SSE4_1`, `HAVE_AVX`, `HAVE_AVX2` définis selon le support CPU
 

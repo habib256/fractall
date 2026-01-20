@@ -81,7 +81,7 @@ main (int argc, char *argv[])
 	
 	int fullscreen = 0;		// Boolean for fullscreen or not
 	int useGui = 1;			// Boolean for gui or not
-	int screenW = 800, screenH = 600;	// Largeur et hauteur de la fenetre
+	int screenW = 1024, screenH = 768;	// Largeur et hauteur de la fenetre
 	int menuH = 51;			// C'est la place que prend le gui
 	int stateH = screenH - 20;		// Place Barre d etat
 	int typeFractale = 1;		//Type de fractale par defaut
@@ -108,15 +108,15 @@ main (int argc, char *argv[])
 		  fprintf (stdout, "Usage : fractall [OPTION]...\n");
 		  fprintf (stdout, "   -help Print this text\n");
 		  fprintf (stdout,
-			  "   -x Pixel width for main window (default : 640)\n");
+			  "   -x Pixel width for main window (default : 1024)\n");
 		  fprintf (stdout,
-			  "   -y Pixel height for main window (default : 480)\n");
+			  "   -y Pixel height for main window (default : 768)\n");
 		  fprintf (stdout, "   -g Gui height (default : 66 | min : 20)\n");
 		  fprintf (stdout,
 			  "   -f Set Fullscreen mode (Press ESC or Q to quit)\n");
 		  fprintf (stdout,
 			  "   -nogui No user interface (key selection still work)\n");
-		  fprintf (stdout, "Example : fractall -f -x640 -y480\n");
+		  fprintf (stdout, "Example : fractall -f -x1024 -y768\n");
 		  // Shutdown All System
 		  SDL_Quit ();
 		  exit (0);
@@ -184,7 +184,7 @@ main (int argc, char *argv[])
 	
 	// On initialise le menu si useGui = TRUE
 	if (useGui)
-		g = SDLGUI_Init (0, 0, win.w, win.y1, stateH, SDL_MapRGB (screen->format, 213, 214, 213), 20);	// 20 boutons (types 1-20)
+		g = SDLGUI_Init (0, 0, win.w, win.y1, stateH, SDL_MapRGB (screen->format, 213, 214, 213), 23);	// 23 boutons (types 1-23)
 	if (useGui)
 		SDLGUI_Draw (screen, &g);
 	

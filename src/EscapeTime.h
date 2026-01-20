@@ -107,6 +107,9 @@ fractalresult Mandelbulb_Iteration (fractal, complex);
 fractalresult PerpendicularBurningShip_Iteration (fractal, complex);
 fractalresult Celtic_Iteration (fractal, complex);
 fractalresult AlphaMandelbrot_Iteration (fractal, complex);
+fractalresult PickoverStalks_Iteration (fractal, complex);
+fractalresult Nova_Iteration (fractal, complex);
+fractalresult Multibrot_Iteration (fractal, complex);
 
 #ifdef HAVE_GMP
 // GMP versions of iteration functions
@@ -125,6 +128,9 @@ fractalresult Mandelbulb_Iteration_GMP (fractal, complex_gmp);
 fractalresult PerpendicularBurningShip_Iteration_GMP (fractal, complex_gmp);
 fractalresult Celtic_Iteration_GMP (fractal, complex_gmp);
 fractalresult AlphaMandelbrot_Iteration_GMP (fractal, complex_gmp);
+fractalresult PickoverStalks_Iteration_GMP (fractal, complex_gmp);
+fractalresult Nova_Iteration_GMP (fractal, complex_gmp);
+fractalresult Multibrot_Iteration_GMP (fractal, complex_gmp);
 #endif
 
  // Fractal Definition
@@ -144,6 +150,9 @@ void Mandelbulb_def (fractal* f);
 void PerpendicularBurningShip_def (fractal* f);
 void Celtic_def (fractal* f);
 void AlphaMandelbrot_def (fractal* f);
+void PickoverStalks_def (fractal* f);
+void Nova_def (fractal* f);
+void Multibrot_def (fractal* f);
 void Buddhabrot_def (fractal* f);
 void Lyapunov_def (fractal* f);
 

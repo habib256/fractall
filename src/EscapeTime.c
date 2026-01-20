@@ -1768,6 +1768,15 @@ void Fractal_ChangeType (fractal* f, int type) {
 	case 20:
 	AlphaMandelbrot_def (f);
 	break;
+	case 21:
+	PickoverStalks_def (f);
+	break;
+	case 22:
+	Nova_def (f);
+	break;
+	case 23:
+	Multibrot_def (f);
+	break;
 	default:
 	Mendelbrot_def (f);
 	}
@@ -1849,10 +1858,13 @@ const char* Fractal_GetTypeName(int type) {
 		"Lyapunov Zircon City",   // 17
 		"Perpendicular Burning Ship", // 18
 		"Celtic",     // 19
-		"Alpha Mandelbrot"  // 20
+		"Alpha Mandelbrot",  // 20
+		"Pickover Stalks",   // 21
+		"Nova",              // 22
+		"Multibrot"          // 23
 	};
 
-	if (type >= 0 && type <= 20) {
+	if (type >= 0 && type <= 23) {
 		return typeNames[type];
 	}
 	return "Unknown";
@@ -2443,6 +2455,197 @@ void AlphaMandelbrot_def (fractal* f) {
 	f->seed = ZeroSetofComplex();
 	f->bailout= 4;
 	f->iterationMax= 2000;  // Divergence plus rapide, moins d'itérations nécessaires
+	f->zoomfactor = 8;
+}
+
+/* Calcul de Pickover Stalks / Biomorphs
+ * Formule de base: z(n+1) = z² + c (Mandelbrot)
+ * Système d'orbit trap: distance_trap = min(|Re(z)|, |Im(z)|)
+ * On stocke trap_min et l'utilisons pour la coloration
+ * Pour la coloration, on utilise -log(trap_min) normalisé dans iteration
+ */
+fractalresult PickoverStalks_Iteration (fractal f, complex zPixel) {
+	int i=0;
+	complex z;
+	fractalresult result;
+	double trap_min = 1e10;  // Valeur initiale très grande
+	double trap_distance;
+	const double trap_divisor = 0.03;  // Ajuste l'épaisseur des stalks
+	
+	z = f.seed;
+	do {
+		double re_abs, im_abs;
+		i++;
+		// Itération Mandelbrot: z(n+1) = z² + c
+		z = Addz(Mulz(z, z), zPixel);
+		
+		// Calcul de la distance au trap (cross: axes Re=0 et Im=0)
+		re_abs = fabs(Rez(z));
+		im_abs = fabs(Imz(z));
+		trap_distance = (re_abs < im_abs) ? re_abs : im_abs;
+		
+		// Mise à jour de trap_min
+		if (trap_distance < trap_min) {
+			trap_min = trap_distance;
+		}
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
+	
+	// Stocker une valeur normalisée basée sur trap_min dans iteration
+	// Utiliser -log(trap_min) pour créer l'effet de coloration souhaité
+	// Normaliser pour que cela fonctionne avec le système de colorisation
+	if (trap_min > 1e-10) {
+		double log_trap = -log(trap_min / trap_divisor);
+		// Normaliser pour que cela corresponde à un nombre d'itérations raisonnable
+		// Utiliser une valeur entre 0 et iterationMax
+		result.iteration = (int)(log_trap * 100.0);
+		if (result.iteration < 0) result.iteration = 0;
+		if (result.iteration >= f.iterationMax) result.iteration = f.iterationMax - 1;
+	} else {
+		// trap_min très petit, point très proche des axes
+		result.iteration = f.iterationMax - 1;
+	}
+	
+	result.z = z;
+	return result;
+}
+void PickoverStalks_def (fractal* f) {
+	/* Valeurs de base pour Pickover Stalks */
+	f->xmin = -2.0;
+	f->xmax = 1.0;
+	f->ymin = -1.5;
+	f->ymax = 1.5;
+	f->seed = ZeroSetofComplex();
+	f->bailout= 100.0;  // Bailout plus élevé pour capturer plus de détails
+	f->iterationMax= 1000;
+	f->zoomfactor = 8;
+}
+
+/* Calcul de Nova Fractal
+ * Formule: z(n+1) = z - a·(p(z)/p'(z)) + c
+ * Pour p(z) = z^p - 1: p'(z) = p·z^(p-1)
+ * Donc: z(n+1) = z - a·((z^p - 1)/(p·z^(p-1))) + c
+ * Pour p=3 (cubique): z(n+1) = z - a·((z³ - 1)/(3·z²)) + c
+ */
+fractalresult Nova_Iteration (fractal f, complex zPixel) {
+	int i=0;
+	complex z, z_prev;
+	fractalresult result;
+	complex a_relax = MakeComplex(1.0, 0.0);  // Paramètre de relaxation (peut être ajusté)
+	int p = 3;  // Exposant polynomial (cubique par défaut)
+	double conv_epsilon = 1e-7;  // Seuil de convergence
+	double conv_epsilon_sq = conv_epsilon * conv_epsilon;
+	
+	// Pour Nova en mode Mandelbrot, utiliser z0 = 1 (racine de z^3 - 1 = 0)
+	// Cela évite la singularité à z=0 où p'(0) = 0 et correspond aux références standard
+	z = MakeComplex(1.0, 0.0);
+	z_prev = z;
+	
+	do {
+		complex z_pow, z_pow_deriv, numerator, denominator, newton_step;
+		i++;
+		
+		// Calcul de z^p
+		z_pow = Powz(z, MakeComplex((double)p, 0.0));
+		// Calcul de z^(p-1)
+		z_pow_deriv = Powz(z, MakeComplex((double)(p-1), 0.0));
+		
+		// p(z) = z^p - 1
+		numerator = Subz(z_pow, ESetofComplex());
+		// p'(z) = p·z^(p-1)
+		denominator = ScalarTimesofComplex((double)p, z_pow_deriv);
+		
+		// Éviter division par zéro
+		if (Magz(denominator) < 1e-10) {
+			break;
+		}
+		
+		// Newton step: p(z)/p'(z)
+		newton_step = Divz(numerator, denominator);
+		// Multiplier par a (relaxation)
+		newton_step = Mulz(a_relax, newton_step);
+		
+		// z(n+1) = z - a·(p(z)/p'(z)) + c
+		z_prev = z;
+		z = Addz(Subz(z, newton_step), zPixel);
+		
+		// Détection de convergence : |z_{n+1} - z_n| devient très petit
+		double diff_sq = Magz2(Subz(z, z_prev));
+		double z_sq = Magz2(z);
+		double denom = (z_sq < 1.0) ? 1.0 : z_sq;
+		
+		if (diff_sq / denom < conv_epsilon_sq) {
+			// Convergence détectée vers une racine
+			break;
+		}
+		
+		// Échappement si |z| devient trop grand
+		if (Magz(z) > f.bailout) {
+			break;
+		}
+	} while (i < f.iterationMax);
+	
+	result.iteration = i;
+	result.z = z;
+	return result;
+}
+void Nova_def (fractal* f) {
+	/* Valeurs de base pour Nova Fractal */
+	f->xmin = -3.0;
+	f->xmax = 3.0;
+	f->ymin = -2.0;
+	f->ymax = 2.0;
+	f->seed = ZeroSetofComplex();
+	f->bailout= 20.0;  // Bailout réduit pour meilleure détection (échappement si |z| > 20)
+	f->iterationMax= 500;  // Suffisant pour la convergence
+	f->zoomfactor = 4;
+}
+
+/* Calcul de Multibrot (Puissances Non-entières)
+ * Formule: z(n+1) = z^d + c
+ * où d est un nombre réel (non-entier)
+ * Utilise la branche principale: z^d = exp(d·log(z))
+ * avec log(z) = ln(|z|) + i·arg(z), arg(z) ∈ (-π, π]
+ */
+fractalresult Multibrot_Iteration (fractal f, complex zPixel) {
+	int i=0;
+	complex z;
+	fractalresult result;
+	double d = 2.5;  // Exposant non-entier (exemple: morphing entre 2 et 3)
+	
+	z = f.seed;
+	do {
+		complex z_pow;
+		i++;
+		
+		// Calcul de z^d via exponentiation complexe
+		// z^d = exp(d·log(z))
+		// Utilise la branche principale automatiquement via Logz
+		// Powz(0, d) avec d > 0 retourne 0 correctement, donc pas besoin de vérification préalable
+		z_pow = Powz(z, MakeComplex(d, 0.0));
+		
+		// Vérifier si le résultat est valide (NaN ou Inf)
+		if (isnan(Rez(z_pow)) || isnan(Imz(z_pow)) || 
+		    isinf(Rez(z_pow)) || isinf(Imz(z_pow))) {
+			break;
+		}
+		
+		// z(n+1) = z^d + c
+		z = Addz(z_pow, zPixel);
+	} while ((i < f.iterationMax) && ( Magz (z) < f.bailout));
+	
+	result.iteration = i;
+	result.z = z;
+	return result;
+}
+void Multibrot_def (fractal* f) {
+	/* Valeurs de base pour Multibrot (puissances non-entières) */
+	f->xmin = -2.5;
+	f->xmax = 1.5;
+	f->ymin = -1.5;
+	f->ymax = 1.5;
+	f->seed = ZeroSetofComplex();
+	f->bailout= 4;
+	f->iterationMax= 5000;
 	f->zoomfactor = 8;
 }
 
@@ -3671,6 +3874,15 @@ fractalresult FormulaSelector (fractal f, complex zPixel) {
 	break;
 	case 20:
 	r=AlphaMandelbrot_Iteration (f,zPixel);
+	break;
+	case 21:
+	r=PickoverStalks_Iteration (f,zPixel);
+	break;
+	case 22:
+	r=Nova_Iteration (f,zPixel);
+	break;
+	case 23:
+	r=Multibrot_Iteration (f,zPixel);
 	break;
 
 	}

@@ -30,7 +30,7 @@ typedef struct gui_struct {   // barre de boutton
   int xplace;        // xplace correspond a x=2 l'ecran
   int xplaceMax;     // Valeur Maximale de xplace
   int barh,barw;     // Largeur de la barre de deplacement
-  int selectedType;  // Type de fractale actuellement sélectionné (1-20)
+  int selectedType;  // Type de fractale actuellement sélectionné (1-23)
   int hoverButton;   // Bouton survolé (-1 si aucun)
 } gui;
 
