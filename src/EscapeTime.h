@@ -38,7 +38,7 @@ typedef struct fractal_struct {
   int bailout;
   int zoomfactor;
   int type;
-  int colorMode;   // 0-7 for different palettes (see colorization.h)
+  int colorMode;   // 0-8 for different palettes (see colorization.h)
   int cmatrix_valid;   // 1 si cmatrix est valide pour le colorMode actuel
   int last_colorMode;  // colorMode lors du dernier calcul de cmatrix
   int colorRepeat;  // Nombre de répétitions du gradient de couleur (2-20, de 2 en 2)

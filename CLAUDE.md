@@ -154,7 +154,7 @@ Algorithme basé sur l'exposant de Lyapunov de la suite logistique x_{n+1} = r_n
 
 ## Palettes de couleurs
 
-8 palettes disponibles (touche **C**) - système unifié de colorisation (`colorization.c`) :
+9 palettes disponibles (touche **C**) - système unifié de colorisation (`colorization.c`) :
 
 | Mode | Description |
 |------|-------------|
@@ -164,8 +164,9 @@ Algorithme basé sur l'exposant de Lyapunov de la suite logistique x_{n+1} = r_n
 | SmoothViolet (3) | Noir → Violet foncé → Rose/Magenta → Blanc |
 | SmoothRainbow (4) | Arc-en-ciel complet (Rouge → Orange → Jaune → Vert → Cyan → Bleu → Violet) |
 | SmoothSunset (5) | Noir → Orange → Rouge → Violet → Bleu foncé |
-| SmoothPlasma (6) | **NOUVEAU** - Bleu profond → Violet → Rose/Corail → Jaune/Orange |
-| SmoothIce (7) | **NOUVEAU** - Blanc → Cyan clair → Bleu profond → Noir |
+| SmoothPlasma (6) | Bleu profond → Violet → Rose/Corail → Jaune/Orange |
+| SmoothIce (7) | Blanc → Cyan clair → Bleu profond → Noir |
+| SmoothCosmic (8) | **NOUVEAU** - Noir profond → Bleu nuit → Sarcelle → Turquoise → Blanc cassé → Jaune pâle → Jaune doré → Orange → Rouge profond (gradient cosmique inspiré des fractales spiralées) |
 
 Toutes utilisent une interpolation continue basée sur des tables de gradient et alternent endroit/envers pour éviter les transitions brutales.
 
@@ -185,7 +186,7 @@ typedef struct {
   int bailout;              // Seuil d'échappement (généralement 4)
   int zoomfactor;           // Facteur de zoom (2-8 selon fractale)
   int type;                 // Type de fractale (1-17)
-  int colorMode;            // 0=SmoothFire, 1=SmoothOcean, 2=SmoothForest, 3=SmoothViolet, 4=SmoothRainbow, 5=SmoothSunset, 6=SmoothPlasma (défaut), 7=SmoothIce
+  int colorMode;            // 0=SmoothFire, 1=SmoothOcean, 2=SmoothForest, 3=SmoothViolet, 4=SmoothRainbow, 5=SmoothSunset, 6=SmoothPlasma (défaut), 7=SmoothIce, 8=SmoothCosmic
   int *fmatrix;             // Matrice d'itérations
   complex *zmatrix;         // Valeurs z finales
   color *cmatrix;           // Couleurs calculées

@@ -23,7 +23,7 @@ typedef struct {
 } color_stop;
 
 #define MAX_COLOR_STOPS 16
-#define NUM_PALETTES 8  /* 6 existing + 2 new */
+#define NUM_PALETTES 9  /* 8 existing + 1 new SmoothCosmic */
 
 /* Gradient table structure */
 typedef struct {
@@ -41,6 +41,7 @@ typedef struct {
 #define PALETTE_SUNSET  5
 #define PALETTE_PLASMA  6
 #define PALETTE_ICE     7
+#define PALETTE_COSMIC  8
 
 /* Use unified color type from color_types.h */
 typedef color colorization_color;

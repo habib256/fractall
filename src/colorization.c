@@ -118,6 +118,23 @@ static const gradient_table GRADIENT_ICE = {
     }
 };
 
+/* Cosmic palette (NEW): Based on spiral fractal analysis - Deep Black -> Blue Night -> Teal -> Turquoise -> White -> Golden Yellow -> Orange -> Deep Red */
+static const gradient_table GRADIENT_COSMIC = {
+    "SmoothCosmic",
+    9,
+    {
+        { 0.000f, 0,   0,   0   },  /* Deep Black */
+        { 0.143f, 0,   0,   51  },  /* Blue Night (#000033) */
+        { 0.286f, 0,   77,  64  },  /* Dark Teal/Sarcelle (#004D40) */
+        { 0.429f, 64,  224, 208 },  /* Turquoise (#40E0D0) */
+        { 0.571f, 200, 220, 240 },  /* Light Gray-Blue (smoky transition) */
+        { 0.714f, 255, 255, 224 },  /* Very Pale Yellow (#FFFFE0) */
+        { 0.857f, 255, 215, 0   },  /* Golden Yellow (#FFD700) */
+        { 0.929f, 255, 165, 0   },  /* Orange (#FFA500) */
+        { 1.000f, 139, 0,   0   }   /* Dark Red (#8B0000) */
+    }
+};
+
 /* Array of all palettes */
 static const gradient_table* palettes[NUM_PALETTES] = {
     &GRADIENT_FIRE,
@@ -127,7 +144,8 @@ static const gradient_table* palettes[NUM_PALETTES] = {
     &GRADIENT_RAINBOW,
     &GRADIENT_SUNSET,
     &GRADIENT_PLASMA,
-    &GRADIENT_ICE
+    &GRADIENT_ICE,
+    &GRADIENT_COSMIC
 };
 
 /* ******************
