@@ -2,556 +2,194 @@
 
 Visualiseur de fractales portable en C utilisant SDL.
 
-**Licence** : GPL-2.0
-**Auteur** : Arnaud VERHILLE (2001-2026)
-**Version** : 1.0
+**Licence** : GPL-2.0 | **Auteur** : Arnaud VERHILLE (2001-2026) | **Version** : 1.0
 
 ## Compilation
 
 ```bash
-./autogen.sh      # Si configure n'existe pas
-./configure       # Options disponibles ci-dessous
-make
-./src/fractall
+./autogen.sh && ./configure && make && ./src/fractall
 ```
 
 ### Options de configuration
 
 | Option | Description | Défaut |
 |--------|-------------|--------|
-| `--with-gmp` | Active la haute précision (zooms profonds) | activé |
-| `--without-gmp` | Désactive GMP | - |
-| `--disable-openmp` | Désactive le calcul parallèle OpenMP | activé |
-| `--disable-simd` | Désactive les optimisations SIMD | activé |
-| `--with-png` | Active l'export PNG avec métadonnées | activé |
-| `--without-png` | Désactive le support PNG (fallback BMP) | - |
+| `--with-gmp` / `--without-gmp` | Haute précision (zooms profonds) | activé |
+| `--disable-openmp` | Désactive le calcul parallèle | activé |
+| `--disable-simd` | Désactive SIMD (SSE4.1/AVX) | activé |
+| `--with-png` / `--without-png` | Export PNG avec métadonnées | activé |
 
-### Dépendances
-
-- SDL 1.2.0+
-- Bibliothèque mathématique (`-lm`)
-- GMP (optionnel) : précision arbitraire pour zooms profonds
-- OpenMP (optionnel) : calcul parallèle multi-cœurs
-- libpng (optionnel) : export PNG avec métadonnées
+**Dépendances** : SDL 1.2.0+, libm, GMP (opt), OpenMP (opt), libpng (opt)
 
 ## Utilisation
 
 ```bash
-fractall [OPTIONS]
+fractall [-x<largeur>] [-y<hauteur>] [-f] [-g<hauteur_gui>] [-nogui] [-h]
 ```
-
-| Option | Description | Défaut |
-|--------|-------------|--------|
-| `-x<n>` | Largeur fenêtre | 1024 |
-| `-y<n>` | Hauteur fenêtre | 768 |
-| `-f` | Plein écran | - |
-| `-g<n>` | Hauteur GUI | 51 |
-| `-nogui` | Sans interface | - |
-| `-h` | Aide | - |
 
 ### Contrôles
 
 | Touche | Effet |
 |--------|-------|
-| **F1** | Von Koch |
-| **F2** | Dragon |
-| **F3** | Mandelbrot |
-| **F4** | Julia |
-| **F5** | Julia Sin |
-| **F6** | Newton |
-| **F7** | Phoenix |
-| **F8** | Buffalo |
-| **F9** | Burning Ship |
-| **F10** | Tricorn |
-| **F11** | Mandelbulb |
-| **F12** | Buddhabrot |
-| **GUI** | 23 boutons pour sélectionner toutes les fractales (types 1-23) |
-| **Clic gauche** | Zoom centré sur le point cliqué / +1 itération (vectorielles) |
-| **Clic gauche + glisser** | Sélection de zone rectangulaire pour zoom précis (escape-time uniquement) |
+| **F1-F12** | Von Koch, Dragon, Mandelbrot, Julia, Julia Sin, Newton, Phoenix, Buffalo, Burning Ship, Tricorn, Mandelbulb, Buddhabrot |
+| **GUI** | 23 boutons (types 1-23) pour accéder à toutes les fractales |
+| **Clic gauche** | Zoom / +1 itération (vectorielles) |
+| **Clic gauche + glisser** | Zoom par sélection rectangulaire (escape-time) |
 | **Clic droit** | Dézoom / -1 itération |
-| **C** | Changer palette |
-| **R** | Changer nombre de répétitions du gradient (2 à 40, de 2 en 2) - Par défaut : 40 pour escape-time, 2 pour Lyapunov |
-| **S** | Screenshot (Screenshot.png avec métadonnées, fallback BMP si PNG indisponible) |
+| **C** | Changer palette (9 palettes) |
+| **R** | Répétitions gradient (2-40, pas de 2) |
+| **S** | Screenshot PNG avec métadonnées |
 | **Q/ESC** | Quitter |
-
-**Note** : Les types 9-12 (Barnsley, Magnet), 17 (Lyapunov) et 18-23 (Perpendicular Burning Ship, Celtic, Alpha Mandelbrot, Pickover Stalks, Nova, Multibrot) sont accessibles uniquement via les boutons GUI.
 
 ## Architecture
 
 ```
 src/
-├── main.c           # Point d'entrée, événements, zoom par sélection
-├── EscapeTime.[ch]  # Fractales escape-time (23 types)
-├── colorization.[ch] # Système unifié de colorisation (9 palettes)
-├── color_types.h    # Type color unifié
-├── VonKoch.[ch]     # Fractales vectorielles
-├── SDLGUI.[ch]      # Interface graphique
-├── complexmath.[ch] # Arithmétique complexe
-├── complexmath_gmp.[ch] # Arithmétique GMP (optionnel)
-├── complexmath_simd.c   # Arithmétique SIMD (SSE4.1/AVX)
+├── main.c              # Point d'entrée, événements, zoom par sélection
+├── EscapeTime.[ch]     # Fractales escape-time (23 types)
+├── colorization.[ch]   # Colorisation unifiée (9 palettes)
+├── color_types.h       # Type color unifié
+├── VonKoch.[ch]        # Fractales vectorielles
+├── SDLGUI.[ch]         # Interface graphique
+├── complexmath.[ch]    # Arithmétique complexe (double)
+├── complexmath_gmp.[ch]# Arithmétique GMP
+├── complexmath_simd.c  # SIMD (SSE4.1/AVX)
 ├── precision_detector.[ch] # Détection précision GMP
-├── gmp_pool.[ch]    # Pool de mémoire GMP pour optimisations
-├── png_save.[ch]    # Export PNG avec métadonnées (optionnel)
-└── SDL_gfx*         # Primitives graphiques
+├── gmp_pool.[ch]       # Pool mémoire GMP
+├── png_save.[ch]       # Export PNG avec métadonnées
+└── SDL_gfx*            # Primitives graphiques
 ```
 
 ## Types de fractales
 
-### Vectorielles (récursives) - Types 1-2
+### Vectorielles (Types 1-2)
 
-| Type | Nom | Itérations max |
-|------|-----|----------------|
+| Type | Nom | Iter max |
+|------|-----|----------|
 | 1 | Von Koch | 8 |
 | 2 | Dragon | 20 |
 
-### Escape-time - Types 3-23
+### Escape-time (Types 3-23)
 
-| Type | Nom | Formule (extrait de `EscapeTime.c`) |
-|------|-----|-------------------------------------|
-| 3 | Mandelbrot | `z(0) = seed` (généralement 0)<br>`z(n+1) = z(n)² + c`<br>où `c = zPixel` |
-| 4 | Julia | `z(0) = zPixel`<br>`z(n+1) = z(n)² + seed` |
-| 5 | Julia Sin | `z(0) = zPixel`<br>`z(n+1) = seed × sin(z(n))` |
-| 6 | Newton | `z(0) = zPixel`<br>`z(n+1) = ((p-1)×z(n)^p + 1) / (p×z(n)^(p-1))`<br>où `p = Re(seed)` (degré polynomial, par défaut 8) |
-| 7 | Phoenix | `z(0) = zPixel`, `y(0) = 0`<br>`z(n+1) = z(n)² + p1 + p2×y(n)`<br>`y(n+1) = z(n)`<br>où `p1 = 0.56667`, `p2 = -0.5` |
-| 8 | Buffalo | `z(0) = seed` (généralement 0)<br>`z² = z×z`<br>`z(n+1) = abs(Re(z²)) + i×abs(Im(z²)) + c` |
-| 9 | Barnsley J | `z(0) = zPixel`<br>Si `Re(z) ≥ 0` : `z(n+1) = (z - 1) × seed`<br>Sinon : `z(n+1) = (z + 1) × seed` |
-| 10 | Barnsley M | `z(0) = zPixel`, `c = zPixel`<br>Si `Re(z) ≥ 0` : `z(n+1) = (z - 1) × c`<br>Sinon : `z(n+1) = (z + 1) × c` |
-| 11 | Magnet J | `z(0) = zPixel`<br>`N = (z² + (seed - 1))²`<br>`Q = 2×z + (seed - 2)`<br>`z(n+1) = N / Q` |
-| 12 | Magnet M | `z(0) = 0`, `c = zPixel`<br>`N = (z² + (c - 1))²`<br>`Q = 2×z + (c - 2)`<br>`z(n+1) = N / Q` |
-| 13 | Burning Ship | `z(0) = seed` (généralement 0)<br>`z(n+1) = (\|Re(z)\| + i×\|Im(z)\|)² + c` |
-| 14 | Tricorn | `z(0) = seed` (généralement 0)<br>`z(n+1) = (conjugué(z))² + c`<br>où `conjugué(z) = Re(z) - i×Im(z)` |
-| 15 | Mandelbulb | `z(0) = seed` (généralement 0)<br>`z(n+1) = z(n)⁸ + c`<br>calculé via `z² → z⁴ → z⁸` |
-| 16 | Buddhabrot | Algorithme de densité : échantillonnage aléatoire, traçage des trajectoires d'échappement |
-| 17 | Lyapunov Zircon City | `x_{n+1} = r_n × x_n × (1 - x_n)`<br>séquence "BBBBBBAAAAAA" (r alterne entre a et b)<br>domaine [2.5, 3.4] × [3.4, 4.0] |
-| 18 | Perpendicular Burning Ship | `z(0) = seed` (généralement 0)<br>`z(n+1) = (Re(z) - i×\|Im(z)\|)² + c`<br>soit `x_{n+1} = x_n² - \|y_n\|² + c_x`<br>`y_{n+1} = -2×x_n×\|y_n\| + c_y` |
-| 19 | Celtic | `z(0) = seed` (généralement 0)<br>`z² = (x² - y²) + i(2xy)`<br>`z(n+1) = \|Re(z²)\| + i×Im(z²) + c` |
-| 20 | Alpha Mandelbrot | `z(0) = seed` (généralement 0)<br>`m = z² + c`<br>`z(n+1) = z² + m² + c`<br>soit `z(n+1) = z² + (z² + c)² + c` |
-| 21 | Pickover Stalks | `z(0) = seed` (généralement 0)<br>`z(n+1) = z² + c` (Mandelbrot)<br>avec orbit trap : `trap_distance = min(\|Re(z)\|, \|Im(z)\|)`<br>coloration basée sur `-log(trap_min)` |
-| 22 | Nova | `z(0) = 1` (racine de z³ - 1 = 0)<br>`p(z) = z^p - 1` (p=3 par défaut)<br>`p'(z) = p×z^(p-1)`<br>`z(n+1) = z - a×(p(z)/p'(z)) + c`<br>où `a = 1.0` (relaxation) |
-| 23 | Multibrot | `z(0) = seed` (généralement 0)<br>`z(n+1) = z^d + c`<br>où `d = 2.5` (réel non-entier)<br>calculé via `z^d = exp(d×log(z))` (branche principale) |
+| Type | Nom | Fonction | Formule | Domaine | Defaults |
+|------|-----|----------|---------|---------|----------|
+| 3 | Mandelbrot | `Mendelbrot_Iteration()` | z₀=seed, z_{n+1}=z²+c | [-2.5,1.5]×[-1.5,1.5] | iter=9370, zoom=8 |
+| 4 | Julia | `Julia_Iteration()` | z₀=zPixel, z_{n+1}=z²+seed | [-2,2]×[-1.5,1.5] | seed=(0.36,-0.08), iter=6250 |
+| 5 | Julia Sin | `JuliaSin_Iteration()` | z₀=zPixel, z_{n+1}=seed×sin(z) | [-π,π]×[-2,2] | seed=(1,0.1) |
+| 6 | Newton | `Newton_Iteration()` | z_{n+1}=((p-1)z^p+1)/(pz^{p-1}) | - | p=8 |
+| 7 | Phoenix | `Phoenix_Iteration()` | z_{n+1}=z²+p1+p2×y, y_{n+1}=z | [-2,2]×[-1.5,1.5] | p1=0.567, p2=-0.5 |
+| 8 | Buffalo | `Buffalo_Iteration()` | z_{n+1}=\|Re(z²)\|+i\|Im(z²)\|+c | [-2.5,1.5]×[-2,2] | iter=9370 |
+| 9 | Barnsley J | `Barnsley1j_Iteration()` | z_{n+1}=(z±1)×seed selon Re(z) | [-4,4]×[-3,3] | seed=(1.1,0.6) |
+| 10 | Barnsley M | `Barnsley1m_Iteration()` | z_{n+1}=(z±1)×c selon Re(z) | [-3,3]×[-2,2] | - |
+| 11 | Magnet J | `Magnet1j_Iteration()` | z_{n+1}=(z²+(seed-1))²/(2z+(seed-2)) | [-2,2]² | seed=(1.63,-0.31) |
+| 12 | Magnet M | `Magnet1m_Iteration()` | z_{n+1}=(z²+(c-1))²/(2z+(c-2)) | [-3,2]×[-2,2] | - |
+| 13 | Burning Ship | `BurningShip_Iteration()` | z_{n+1}=(\|Re(z)\|+i\|Im(z)\|)²+c | [-2.5,1.5]×[-2,2] | - |
+| 14 | Tricorn | `Tricorn_Iteration()` | z_{n+1}=conj(z)²+c | [-2.5,1.5]×[-1.5,1.5] | - |
+| 15 | Mandelbulb | `Mandelbulb_Iteration()` | z_{n+1}=z⁸+c | [-1.5,1.5]² | - |
+| 16 | Buddhabrot | `Buddhabrot_Draw()` | Densité trajectoires z²+c | [-2.5,1.5]×[-1.5,1.5] | iter=220 |
+| 17 | Lyapunov | `Lyapunov_Draw()` | x_{n+1}=r×x(1-x), séq "BBBBBBAAAAAA" | [2.5,3.4]×[3.4,4] | iter=2000 |
+| 18 | Perp. Burning Ship | `PerpendicularBurningShip_Iteration()` | z_{n+1}=(Re(z)-i\|Im(z)\|)²+c | [-2.5,1.5]×[-1.5,1.5] | iter=5000 |
+| 19 | Celtic | `Celtic_Iteration()` | z_{n+1}=\|Re(z²)\|+i×Im(z²)+c | [-2,1]×[-1.5,1.5] | iter=5000 |
+| 20 | Alpha Mandelbrot | `AlphaMandelbrot_Iteration()` | z_{n+1}=z²+(z²+c)²+c | [-2.5,1.5]×[-1.5,1.5] | iter=2000 |
+| 21 | Pickover Stalks | `PickoverStalks_Iteration()` | z²+c avec trap min(\|Re\|,\|Im\|) | [-2,1]×[-1.5,1.5] | bailout=100, iter=1000 |
+| 22 | Nova | `Nova_Iteration()` | z_{n+1}=z-a(z³-1)/(3z²)+c | [-3,3]×[-2,2] | bailout=20, iter=500 |
+| 23 | Multibrot | `Multibrot_Iteration()` | z_{n+1}=z^{2.5}+c | [-2.5,1.5]×[-1.5,1.5] | iter=5000 |
 
-### Buffalo (Type 8)
+**Notes** : Types 9-12, 17-23 accessibles uniquement via GUI. Bailout par défaut = 4.
 
-Variation du Burning Ship avec `abs()` appliqué aux deux parties après le carré :
-- **Formule** : `z(0) = seed` (généralement 0)<br>`z² = z×z`<br>`z(n+1) = abs(Re(z²)) + i×abs(Im(z²)) + c`
-- Produit des formes symétriques ressemblant à un bison
-- Accessible via **F8** ou bouton GUI
-- Valeurs par défaut : domaine [-2.5, 1.5] × [-2.0, 2.0], bailout=4, iterationMax=9370
+## Palettes de couleurs (9)
 
-### Buddhabrot (Type 16)
+| # | Nom | Gradient |
+|---|-----|----------|
+| 0 | SmoothFire | Noir → Rouge → Jaune → Blanc |
+| 1 | SmoothOcean | Noir → Bleu → Cyan → Blanc |
+| 2 | SmoothForest | Noir → Vert → Jaune/Vert → Blanc |
+| 3 | SmoothViolet | Noir → Violet → Rose → Blanc |
+| 4 | SmoothRainbow | Arc-en-ciel complet |
+| 5 | SmoothSunset | Noir → Orange → Rouge → Violet → Bleu |
+| 6 | SmoothPlasma | Bleu → Violet → Rose → Orange (défaut) |
+| 7 | SmoothIce | Blanc → Cyan → Bleu → Noir |
+| 8 | SmoothCosmic | Noir → Bleu nuit → Turquoise → Jaune → Orange → Rouge |
 
-Algorithme de densité différent :
-1. Échantillonnage aléatoire du plan complexe
-2. Trace les trajectoires des points qui s'échappent (itération Mandelbrot : `z(n+1) = z² + c`)
-3. Incrémente un compteur de densité par pixel traversé
-4. Couleur finale basée sur densité (échelle logarithmique)
-- Valeurs par défaut : domaine [-2.5, 1.5] × [-1.5, 1.5], bailout=4, iterationMax=220
-
-### Lyapunov (Type 17)
-
-Algorithme basé sur l'exposant de Lyapunov de la suite logistique :
-
-**Formule** : `x_{n+1} = r_n × x_n × (1 - x_n)`
-
-**Principe** :
-1. Le paramètre `r` alterne entre `a` (axe X) et `b` (axe Y) selon la séquence "BBBBBBAAAAAA"
-2. Phase de stabilisation (warmup) de 50 itérations
-3. Calcul de l'exposant de Lyapunov sur 2000 itérations par défaut
-4. Coloration avec palettes (SmoothPlasma par défaut, 2 répétitions par défaut)
-5. Domaine : [2.5, 3.4] × [3.4, 4.0] (image de référence classique "Zircon City")
-
-**Note** : Les variantes Lyapunov 18-27 ont été supprimées. Seule Zircon City (type 17) est conservée.
-
-## Détails des formules (extraits de `EscapeTime.c`)
-
-### Type 3 - Mandelbrot
-- **Fonction** : `Mendelbrot_Iteration()`
-- **Formule** : `z(0) = seed` (généralement 0), `z(n+1) = z(n)² + c` où `c = zPixel`
-- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=9370, zoomfactor=8
-
-### Type 4 - Julia
-- **Fonction** : `Julia_Iteration()`
-- **Formule** : `z(0) = zPixel`, `z(n+1) = z(n)² + seed`
-- **Valeurs par défaut** : domaine [-2.0, 2.0] × [-1.5, 1.5], seed=(0.36228, -0.0777), bailout=4, iterationMax=6250, zoomfactor=4
-
-### Type 5 - Julia Sin
-- **Fonction** : `JuliaSin_Iteration()`
-- **Formule** : `z(0) = zPixel`, `z(n+1) = seed × sin(z(n))`
-- **Valeurs par défaut** : domaine [-π, π] × [-2, 2], seed=(1, 0.1), bailout=4, iterationMax=6250, zoomfactor=4
-
-### Type 6 - Newton
-- **Fonction** : `Newton_Iteration()`
-- **Formule** : `z(0) = zPixel`, `z(n+1) = ((p-1)×z(n)^p + 1) / (p×z(n)^(p-1))` où `p = Re(seed)` (degré polynomial)
-- **Valeurs par défaut** : seed=(8, 0) donc p=8, bailout=4, iterationMax variable selon précision
-
-### Type 7 - Phoenix
-- **Fonction** : `Phoenix_Iteration()`
-- **Formule** : `z(0) = zPixel`, `y(0) = 0`<br>`z(n+1) = z(n)² + p1 + p2×y(n)`<br>`y(n+1) = z(n)`<br>où `p1 = 0.56667`, `p2 = -0.5`
-- **Valeurs par défaut** : domaine [-2.0, 2.0] × [-1.5, 1.5], bailout=4, iterationMax=9370, zoomfactor=8
-
-### Type 8 - Buffalo
-- **Fonction** : `Buffalo_Iteration()`
-- **Formule** : `z(0) = seed` (généralement 0)<br>`z² = z×z`<br>`z(n+1) = abs(Re(z²)) + i×abs(Im(z²)) + c`
-- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-2.0, 2.0], seed=0, bailout=4, iterationMax=9370, zoomfactor=8
-
-### Type 9 - Barnsley J (Julia)
-- **Fonction** : `Barnsley1j_Iteration()`
-- **Formule** : `z(0) = zPixel`<br>Si `Re(z) ≥ 0` : `z(n+1) = (z - 1) × seed`<br>Sinon : `z(n+1) = (z + 1) × seed`
-- **Valeurs par défaut** : domaine [-4, 4] × [-3, 3], seed=(1.1, 0.6), bailout=4, iterationMax=3120, zoomfactor=4
-
-### Type 10 - Barnsley M (Mandelbrot)
-- **Fonction** : `Barnsley1m_Iteration()`
-- **Formule** : `z(0) = zPixel`, `c = zPixel`<br>Si `Re(z) ≥ 0` : `z(n+1) = (z - 1) × c`<br>Sinon : `z(n+1) = (z + 1) × c`
-- **Valeurs par défaut** : domaine [-3, 3] × [-2, 2], bailout=4, iterationMax=9370, zoomfactor=8
-
-### Type 11 - Magnet J (Julia)
-- **Fonction** : `Magnet1j_Iteration()`
-- **Formule** : `z(0) = zPixel`<br>`N = (z² + (seed - 1))²`<br>`Q = 2×z + (seed - 2)`<br>`z(n+1) = N / Q`
-- **Valeurs par défaut** : domaine [-2, 2] × [-2, 2], seed=(1.625458, -0.306159), bailout=4, iterationMax=9370, zoomfactor=4
-
-### Type 12 - Magnet M (Mandelbrot)
-- **Fonction** : `Magnet1m_Iteration()`
-- **Formule** : `z(0) = 0`, `c = zPixel`<br>`N = (z² + (c - 1))²`<br>`Q = 2×z + (c - 2)`<br>`z(n+1) = N / Q`
-- **Valeurs par défaut** : domaine [-3, 2] × [-2, 2], bailout=4, iterationMax=9370, zoomfactor=8
-
-### Type 13 - Burning Ship
-- **Fonction** : `BurningShip_Iteration()`
-- **Formule** : `z(0) = seed` (généralement 0)<br>`z(n+1) = (|Re(z)| + i×|Im(z)|)² + c`
-- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-2.0, 2.0], seed=0, bailout=4, iterationMax=9370, zoomfactor=8
-
-### Type 14 - Tricorn
-- **Fonction** : `Tricorn_Iteration()`
-- **Formule** : `z(0) = seed` (généralement 0)<br>`z(n+1) = (conjugué(z))² + c`<br>où `conjugué(z) = Re(z) - i×Im(z)`
-- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=9370, zoomfactor=8
-
-### Type 15 - Mandelbulb
-- **Fonction** : `Mandelbulb_Iteration()`
-- **Formule** : `z(0) = seed` (généralement 0)<br>`z(n+1) = z(n)⁸ + c`<br>calculé via `z² → z⁴ → z⁸`
-- **Valeurs par défaut** : domaine [-1.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=9370, zoomfactor=8
-
-### Type 16 - Buddhabrot
-- **Fonction** : `Buddhabrot_Draw()` (algorithme spécial)
-- **Formule de base** : `z(n+1) = z² + c` (Mandelbrot)
-- **Algorithme** : Échantillonnage aléatoire, traçage des trajectoires d'échappement
-- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=220, zoomfactor=4
-
-### Type 17 - Lyapunov Zircon City
-- **Fonction** : `Lyapunov_Draw()` (algorithme spécial)
-- **Formule** : `x_{n+1} = r_n × x_n × (1 - x_n)`<br>séquence "BBBBBBAAAAAA" (r alterne entre a et b)
-- **Valeurs par défaut** : domaine [2.5, 3.4] × [3.4, 4.0], warmup=50, iterations=2000
-
-### Type 18 - Perpendicular Burning Ship
-- **Fonction** : `PerpendicularBurningShip_Iteration()`
-- **Formule** : `z(0) = seed` (généralement 0)<br>`z(n+1) = (Re(z) - i×|Im(z)|)² + c`<br>soit `x_{n+1} = x_n² - |y_n|² + c_x`<br>`y_{n+1} = -2×x_n×|y_n| + c_y`
-- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=5000, zoomfactor=8
-
-### Type 19 - Celtic
-- **Fonction** : `Celtic_Iteration()`
-- **Formule** : `z(0) = seed` (généralement 0)<br>`z² = (x² - y²) + i(2xy)`<br>`z(n+1) = |Re(z²)| + i×Im(z²) + c`
-- **Valeurs par défaut** : domaine [-2.0, 1.0] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=5000, zoomfactor=8
-
-### Type 20 - Alpha Mandelbrot
-- **Fonction** : `AlphaMandelbrot_Iteration()`
-- **Formule** : `z(0) = seed` (généralement 0)<br>`m = z² + c`<br>`z(n+1) = z² + m² + c`<br>soit `z(n+1) = z² + (z² + c)² + c`
-- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=2000, zoomfactor=8
-
-### Type 21 - Pickover Stalks
-- **Fonction** : `PickoverStalks_Iteration()`
-- **Formule** : `z(0) = seed` (généralement 0)<br>`z(n+1) = z² + c` (Mandelbrot)<br>avec orbit trap : `trap_distance = min(|Re(z)|, |Im(z)|)`<br>coloration basée sur `-log(trap_min)` normalisé
-- **Valeurs par défaut** : domaine [-2.0, 1.0] × [-1.5, 1.5], seed=0, bailout=100.0, iterationMax=1000, zoomfactor=8
-
-### Type 22 - Nova
-- **Fonction** : `Nova_Iteration()`
-- **Formule** : `z(0) = 1` (racine de z³ - 1 = 0)<br>`p(z) = z^p - 1` (p=3 par défaut)<br>`p'(z) = p×z^(p-1)`<br>`z(n+1) = z - a×(p(z)/p'(z)) + c`<br>où `a = 1.0` (relaxation)
-- **Valeurs par défaut** : domaine [-3.0, 3.0] × [-2.0, 2.0], seed=0, bailout=20.0, iterationMax=500, zoomfactor=4
-
-### Type 23 - Multibrot
-- **Fonction** : `Multibrot_Iteration()`
-- **Formule** : `z(0) = seed` (généralement 0)<br>`z(n+1) = z^d + c`<br>où `d = 2.5` (réel non-entier)<br>calculé via `z^d = exp(d×log(z))` (branche principale)
-- **Valeurs par défaut** : domaine [-2.5, 1.5] × [-1.5, 1.5], seed=0, bailout=4, iterationMax=5000, zoomfactor=8
-
-## Palettes de couleurs
-
-9 palettes disponibles (touche **C**) - système unifié de colorisation (`colorization.c`) :
-
-| Mode | Description |
-|------|-------------|
-| SmoothFire (0) | Noir → Rouge → Jaune → Blanc (dégradés fluides, répétition configurable) |
-| SmoothOcean (1) | Noir → Bleu → Cyan → Blanc (dégradés fluides, répétition configurable) |
-| SmoothForest (2) | Noir → Vert foncé → Jaune/Vert clair → Blanc |
-| SmoothViolet (3) | Noir → Violet foncé → Rose/Magenta → Blanc |
-| SmoothRainbow (4) | Arc-en-ciel complet (Rouge → Orange → Jaune → Vert → Cyan → Bleu → Violet) |
-| SmoothSunset (5) | Noir → Orange → Rouge → Violet → Bleu foncé |
-| SmoothPlasma (6) | Bleu profond → Violet → Rose/Corail → Jaune/Orange |
-| SmoothIce (7) | Blanc → Cyan clair → Bleu profond → Noir |
-| SmoothCosmic (8) | **NOUVEAU** - Noir profond → Bleu nuit → Sarcelle → Turquoise → Blanc cassé → Jaune pâle → Jaune doré → Orange → Rouge profond (gradient cosmique inspiré des fractales spiralées) |
-
-Toutes utilisent une interpolation continue basée sur des tables de gradient et alternent endroit/envers pour éviter les transitions brutales.
-
-**Note** : Buddhabrot et Lyapunov supportent maintenant toutes les 9 palettes disponibles (touche C).
+Interpolation continue avec alternance endroit/envers. `colorRepeat` : 40 (escape-time), 2 (Lyapunov).
 
 ## Structure principale
 
-### `fractal` (EscapeTime.h)
-
 ```c
-// Structure de cache pour réutilisation lors de zooms
-typedef struct {
-  double xmin_cached, xmax_cached, ymin_cached, ymax_cached;
-  int* fmatrix_cached;
-  color* cmatrix_cached;
-  int cache_valid;
-  int cache_xpixel, cache_ypixel;  // Dimensions du cache
-} fractal_cache;
-
 typedef struct fractal_struct {
-  int xpixel, ypixel;       // Dimensions en pixels
-  double xmin, xmax;        // Bornes du plan complexe
-  double ymin, ymax;
-  complex seed;             // Paramètre c pour Julia
-  int iterationMax;         // Limite d'itérations
-  int bailout;              // Seuil d'échappement (généralement 4)
-  int zoomfactor;           // Facteur de zoom (2-8 selon fractale)
-  int type;                 // Type de fractale (1-23)
-  int colorMode;            // 0=SmoothFire, 1=SmoothOcean, 2=SmoothForest, 3=SmoothViolet, 4=SmoothRainbow, 5=SmoothSunset, 6=SmoothPlasma (défaut), 7=SmoothIce, 8=SmoothCosmic
-  int cmatrix_valid;        // 1 si cmatrix est valide pour le colorMode actuel
-  int last_colorMode;       // colorMode lors du dernier calcul de cmatrix
-  int colorRepeat;           // Nombre de répétitions du gradient (2-40, de 2 en 2)
-  int last_colorRepeat;      // colorRepeat lors du dernier calcul de cmatrix
-  double zoom_level;         // Niveau de zoom actuel pour détection de changement
-  int *fmatrix;              // Matrice d'itérations
-  complex *zmatrix;          // Valeurs z finales
-  color *cmatrix;            // Couleurs calculées
-  fractal_cache cache;       // Cache pour réutilisation lors de zooms
+  int xpixel, ypixel;           // Dimensions pixels
+  double xmin, xmax, ymin, ymax;// Plan complexe
+  complex seed;                 // Paramètre Julia
+  int iterationMax, bailout;    // Limites
+  int zoomfactor, type;         // Zoom (2-8), type (1-23)
+  int colorMode, colorRepeat;   // Palette (0-8), répétitions (2-40)
+  int cmatrix_valid;            // Cache colorisation valide
+  int *fmatrix;                 // Matrice itérations
+  complex *zmatrix;             // Valeurs z finales
+  color *cmatrix;               // Couleurs calculées
+  fractal_cache cache;          // Cache zoom
 #ifdef HAVE_GMP
-  int use_gmp;               // Utiliser GMP (1) ou double (0)
-  mp_bitcnt_t gmp_precision; // Précision GMP en bits
-  complex_gmp *zmatrix_gmp;  // Matrice GMP optionnelle
-  mpf_t xmin_gmp, xmax_gmp;  // Coordonnées GMP
-  mpf_t ymin_gmp, ymax_gmp;
-  gmp_iteration_context iteration_ctx;  // Contexte pré-alloué pour itérations
-  gmp_mul_temps mul_temps;    // Temporaires de multiplication pré-alloués
+  int use_gmp;                  // Mode GMP actif
+  mp_bitcnt_t gmp_precision;    // Précision bits
+  // ... structures GMP pré-allouées
 #endif
 } fractal;
 ```
 
-**Notes importantes** :
-- Le système de cache (`fractal_cache`) permet de réutiliser les calculs lors de zooms successifs pour améliorer les performances
-- `cmatrix_valid` et `last_colorMode`/`last_colorRepeat` permettent d'éviter le recalcul de la colorisation si seule la palette ou les répétitions changent
-- `colorRepeat` : nombre de répétitions du gradient (2 à 40, de 2 en 2) - modifiable avec la touche **R**
-  - Valeur par défaut : **40** pour les fractales escape-time (types 3-16, 18-23)
-  - Valeur par défaut : **2** pour Lyapunov (type 17)
-- Avec GMP, `iteration_ctx` et `mul_temps` sont des structures pré-allouées pour optimiser les allocations mémoire lors des itérations
+## Optimisations
 
-## Optimisation du rendu
+### Divergence Detection (DDp1/DDp2)
+Rendu en 2 passes : grille 2×2 puis affinage. Évite calcul si 4 voisins identiques.
 
-### Divergence Detection
+### OpenMP
+Parallélisation multi-cœurs avec `#pragma omp parallel for`, ordonnancement `guided`. Incréments atomiques pour Buddhabrot.
 
-Algorithme en deux passes :
-
-1. **DDp1** : Calcul grille 2×2, interpolation pixels intermédiaires
-2. **DDp2** : Affinage des manquants, évite calcul si 4 voisins identiques
-
-Permet un aperçu rapide suivi d'un rendu complet.
-
-### Parallélisation OpenMP
-
-Avec OpenMP activé, le calcul des fractales est parallélisé sur tous les cœurs CPU :
-- Boucles de rendu DDp1/DDp2 parallélisées avec `#pragma omp parallel for`
-- Ordonnancement `guided` pour équilibrage dynamique de charge
-- Variables thread-local pour éviter les race conditions
-- Support spécial pour Buddhabrot (incréments atomiques sur la matrice de densité)
-- Support spécial pour Lyapunov (parallélisation par lignes)
-
-### Optimisations SIMD
-
-Opérations vectorisées sur nombres complexes (`complexmath_simd.c`) :
-- **SSE4.1** : 2 complexes traités simultanément (128 bits)
-- **AVX** : 4 complexes traités simultanément (256 bits)
+### SIMD
+- **SSE4.1** : 2 complexes/op (128 bits)
+- **AVX** : 4 complexes/op (256 bits)
 - Fonctions : `complex_mul_sse4()`, `complex_add_sse4()`, `complex_mag2_sse4()`, `complex_mul_avx()`
 
-La détection des instructions SIMD est automatique à la compilation.
+### GMP
+Précision arbitraire automatique pour zooms profonds. Pool mémoire (`gmp_pool.[ch]`) et contextes pré-alloués.
 
-## Zoom par sélection de zone
+## Export PNG
 
-Pour les fractales escape-time (types 3-23), un zoom par sélection de zone rectangulaire est disponible :
+Métadonnées incluses : FractalType, XMin/XMax/YMin/YMax, Iterations, Bailout, ColorMode, ColorRepeat, JuliaSeed (types 4-5), dimensions, Software.
 
-1. **Maintenir** le clic gauche et **glisser** pour dessiner un rectangle jaune
-2. **Relâcher** pour zoomer sur la zone sélectionnée
-3. Le rapport d'aspect est automatiquement préservé
-
-Cette fonctionnalité est implémentée dans `main.c` (événements `SDL_MOUSEBUTTONDOWN`, `SDL_MOUSEMOTION`, `SDL_MOUSEBUTTONUP`).
-
-## Précision GMP
-
-Avec `--with-gmp`, le programme détecte automatiquement quand la précision double (53 bits) devient insuffisante et bascule vers GMP. La précision augmente dynamiquement avec le niveau de zoom.
-
-**Optimisations GMP** :
-- Pool de mémoire (`gmp_pool.[ch]`) : réutilisation de structures GMP pré-allouées pour réduire les allocations
-- Contexte d'itération (`gmp_iteration_context`) : variables temporaires pré-allouées pour chaque itération
-- Temporaires de multiplication (`gmp_mul_temps`) : structures optimisées pour les multiplications complexes
-
-Fichiers clés :
-- `precision_detector.[ch]` : Détection automatique du seuil de précision
-- `complexmath_gmp.[ch]` : Arithmétique complexe en précision arbitraire
-- `gmp_pool.[ch]` : Système de pool de mémoire pour optimiser les allocations GMP
+Fonctions : `SavePNGWithMetadata()`, `LoadPNGMetadata()`
 
 ## Barre d'état
 
-Affiche : Type | Rep:N | Palette | Iter:N | Zoom | Centre (x,y) | Temps (ms) | [Précision GMP]
-
-- **Rep:N** : Nombre de répétitions du gradient
-- **Iter:N** : Nombre d'itérations maximum
-- **Précision GMP** : Affiché uniquement si GMP est actif (ex: "GMP 128 bits")
+`Type | Rep:N | Palette | Iter:N | Zoom | Centre (x,y) | Temps (ms) | [GMP N bits]`
 
 ## Flux d'exécution
 
 ```
-main()
-  ├── Parsing arguments
-  ├── SDL_Init()
-  ├── SDLGUI_Init()
-  ├── Fractal_Init()
-  └── Boucle principale
-        ├── SDL_WaitEvent()
-        └── EventCheck()
-              ├── Clavier (F1-F12, C, S, Q)
-              ├── Souris (zoom, GUI)
-              └── Quit
+main() → SDL_Init() → SDLGUI_Init() → Fractal_Init()
+       → Boucle: SDL_WaitEvent() → EventCheck() → Clavier/Souris/Quit
 ```
 
-## Export PNG avec métadonnées
+## Fonctions clés
 
-L'export PNG (touche **S**) inclut des métadonnées permettant de recalculer la fractale :
+| Fonction | Fichier | Description |
+|----------|---------|-------------|
+| `Fractal_Draw()` | EscapeTime.c | Dispatch vers DDp1/DDp2 ou algorithmes spéciaux (16-17) |
+| `Fractal_Init()` | EscapeTime.c | Initialisation avec defaults selon type |
+| `Fractal_GetTypeName()` | EscapeTime.c | Nom du type (0-23) |
+| `Buddhabrot_Draw()` | EscapeTime.c | Algorithme densité trajectoires |
+| `Lyapunov_Draw()` | EscapeTime.c | Exposant de Lyapunov |
+| `GetColorForIteration()` | colorization.c | Colorisation unifiée |
+| `SDLGUI_Init()` | SDLGUI.c | Initialisation GUI 23 boutons |
 
-| Métadonnée | Description |
-|------------|-------------|
-| FractalType | Type de fractale (1-23) |
-| XMin, XMax, YMin, YMax | Coordonnées du plan complexe |
-| Iterations | Nombre d'itérations maximum |
-| Bailout | Seuil d'échappement |
-| ColorMode | Index de la palette (0-8) |
-| ColorRepeat | Nombre de répétitions du gradient |
-| JuliaSeedX, JuliaSeedY | Seed Julia (types 4 et 5 uniquement) |
-| ImageWidth, ImageHeight | Dimensions en pixels |
-| Software | "fractall 0.5" |
+## Notes techniques
 
-La fonction `LoadPNGMetadata()` permet de recharger ces paramètres depuis un fichier PNG.
+- GUI : 51px haut, barre d'état : 20px bas
+- Defines : `HAVE_OPENMP`, `HAVE_SSE4_1`, `HAVE_AVX`, `HAVE_AVX2`, `HAVE_PNG`, `HAVE_GMP`
+- Zoom sélection : `main.c` (SDL_MOUSEBUTTONDOWN/MOTION/UP)
 
 ## TODO
 
-- ~~Export PNG avec métadonnées~~ ✅ Implémenté
 - Historique zoom (undo/redo)
 - Palettes personnalisables
-- Amélioration du GUI (voir section ci-dessous)
-- Nouveaux types de fractales (voir PLAN_RECHERCHE_FRACTALES.md)
-
-## Améliorations possibles : Nouveaux types de fractales
-
-Un plan de recherche détaillé est disponible dans **PLAN_RECHERCHE_FRACTALES.md**.
-
-### Catégories identifiées
-
-#### Priorité HAUTE (faciles à implémenter) ✅ COMPLÉTÉ
-1. **Perpendicular Burning Ship** (Type 18) ✅ - Variante du Burning Ship avec pliage perpendiculaire
-   - Formule : `z(n+1) = (Re(z) - i×|Im(z)|)² + c`
-   - Complexité : ⭐ Faible (similaire au type 13)
-
-2. **Celtic Fractal** (Type 19) ✅ - Formes celtiques entrelacées
-   - Formule : `z(n+1) = |Re(z²)| + i×Im(z²) + c`
-   - Complexité : ⭐ Faible
-
-3. **Alpha Mandelbrot** (Type 20) ✅ - Structures superposées
-   - Formule : `z(n+1) = z² + (z² + c)² + c`
-   - Complexité : ⭐ Faible
-
-#### Priorité MOYENNE (intéressantes mais plus complexes) ✅ COMPLÉTÉ
-4. **Pickover Stalks / Biomorphs** (Type 21) ✅ - Formes biologiques/organiques
-   - Formule : `z(n+1) = z² + c` avec orbit trap `min(|Re(z)|, |Im(z)|)`
-   - Complexité : ⭐⭐ Moyenne (système d'orbit trap)
-
-5. **Nova Fractal** (Type 22) ✅ - Variante Newton avec spirales élégantes
-   - Formule : `z(n+1) = z - a·(p(z)/p'(z)) + c` (p(z) = z³ - 1)
-   - Complexité : ⭐⭐ Moyenne (dérivée polynomiale)
-
-6. **Multibrot (puissances non-entières)** (Type 23) ✅ - Morphing entre formes
-   - Formule : `z(n+1) = z^d + c` (d réel, ex: 2.5)
-   - Complexité : ⭐⭐ Moyenne (gestion branch cuts)
-
-#### Priorité BASSE (nécessitent modifications architecturales)
-7. **Fractales 3D/Quaternions** - Mandelbox, Quaternion Julia
-   - Complexité : ⭐⭐⭐ Élevée (rendu 3D requis)
-
-### Ressources de recherche
-
-- **FractalForums.com** : Base de données de formules
-- **UltraFractal.com** : Bibliothèque de formules documentées
-- **Paul Bourke** (paulbourke.net) : Articles et algorithmes
-- **GitHub** : Implémentations open-source (kf2, Fractalshades)
-
-Voir **PLAN_RECHERCHE_FRACTALES.md** pour le plan détaillé de recherche et d'implémentation.
-
-## Notes
-
-- GUI : 51px en haut, barre d'état : 20px en bas
-- 23 boutons dans le GUI (types 1-23)
-- `Buddhabrot_Draw()` pour le type 16 (algorithme de densité)
-- `Lyapunov_Draw()` pour le type 17 (algorithme d'exposant de Lyapunov - Zircon City)
-- `Fractal_Draw()` détecte automatiquement les types 16-17 et appelle leurs fonctions spécialisées
-- `Fractal_GetTypeName()` retourne le nom selon le type (0-23)
-- `SavePNGWithMetadata()` et `LoadPNGMetadata()` pour l'export/import PNG avec métadonnées
-- OpenMP : `HAVE_OPENMP` défini dans `config.h` si disponible
-- SIMD : `HAVE_SSE4_1`, `HAVE_AVX`, `HAVE_AVX2` définis selon le support CPU
-- PNG : `HAVE_PNG` défini dans `config.h` si libpng disponible
-
-## Propositions d'amélioration du GUI
-
-### État actuel
-
-Le GUI actuel (`SDLGUI.c`) est minimaliste :
-- Barre de 23 boutons carrés avec aperçu miniature de chaque fractale (types 1-23)
-- Barre de défilement horizontale (car tous les boutons ne rentrent pas)
-- Barre d'état en bas affichant : Type | Palette | Zoom | Centre | Temps
-- Structure `gui` contient `selectedType` (type actuellement sélectionné) et `hoverButton` (bouton survolé)
-
-### Améliorations proposées
-
-#### 1. Tooltips sur les boutons
-Afficher le nom de la fractale au survol du bouton (hover).
-```c
-// Nouvelle fonction dans SDLGUI.c
-void SDLGUI_DrawTooltip(SDL_Surface* screen, int x, int y, const char* text);
-```
-
-#### 2. Indicateur de sélection
-Mettre en évidence le bouton de la fractale actuellement sélectionnée (bordure colorée ou surbrillance).
-
-#### 3. Panneau de contrôle latéral (optionnel)
-Ajouter un panneau rétractable avec :
-- Sélecteur de palette (liste déroulante ou boutons colorés)
-- Slider pour colorRepeat (2-40)
-- Affichage des coordonnées en temps réel
-- Bouton Reset (retour aux coordonnées par défaut)
-
-#### 4. Minimap de navigation
-Petite fenêtre montrant la vue globale avec un rectangle indiquant la zone zoomée actuelle.
-
-#### 5. Barre d'outils secondaire
-Ajouter des boutons pour les actions fréquentes :
-- [C] Palette suivante
-- [R] Répétitions
-- [S] Screenshot
-- [←] Undo zoom
-- [→] Redo zoom
-
-#### 6. Raccourcis clavier affichés
-Afficher les raccourcis sur les boutons ou dans les tooltips (ex: "F3" sur le bouton Mandelbrot).
-
-#### 7. Mode plein écran amélioré
-Cacher le GUI en mode plein écran avec possibilité de le faire apparaître au survol du haut de l'écran.
-
-### Priorité suggérée
-
-1. **Facile** : Indicateur de sélection, raccourcis affichés
-2. **Moyen** : Tooltips, barre d'outils secondaire
-3. **Complexe** : Panneau latéral, minimap, historique zoom
+- GUI : tooltips, indicateur sélection, panneau latéral
+- Fractales 3D/Quaternions (architecture majeure requise)
