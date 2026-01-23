@@ -3023,308 +3023,178 @@ Uint32 Buddhabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int deca
 
 	// Phase 1: Échantillonnage parallèle avec OpenMP et rendu incrémental
 #ifdef HAVE_OPENMP
-	// Variable de cancellation partagée pour arrêt rapide
+	// Variable de cancellation partagée - volatile pour visibilité entre threads
 	volatile int cancelled = 0;
-	// Compteur partagé pour la répartition du travail (déclaré avant la région parallèle)
-	int sample_counter_shared = 0;
-	
-	// Créer la région parallèle UNE SEULE FOIS avant la boucle des chunks
-	// Cela évite la surcharge de création/destruction répétée des threads
-	#pragma omp parallel shared(sample_counter_shared)
+
+	// Compteur atomique pour la distribution du travail
+	volatile int sample_counter = 0;
+
+	int num_threads = omp_get_max_threads();
+	printf("Buddhabrot: %d samples, %d threads\n", numSamples, num_threads);
+
+	// Région parallèle - TOUS les threads font du calcul
+	// Le thread 0 vérifie aussi les événements périodiquement
+	#pragma omp parallel shared(cancelled, sample_counter)
 	{
-		// Variables thread-local pour génération aléatoire thread-safe
-		// Initialiser la seed une seule fois par thread (basée sur thread_id uniquement)
-		unsigned int thread_id = omp_get_thread_num();
-		unsigned int seed = (unsigned int)(42 + thread_id * 1000);
-		
-		// Allouer les buffers une seule fois par thread (réutilisés entre chunks)
+		int thread_id = omp_get_thread_num();
+		unsigned int seed = (unsigned int)(42 + thread_id * 12345);
+
+		// Allouer les buffers par thread
 		double *trajX = (double*) malloc(iterMax * sizeof(double));
 		double *trajY = (double*) malloc(iterMax * sizeof(double));
-		
-		if (trajX == NULL || trajY == NULL) {
-			fprintf(stderr, "Erreur allocation mémoire trajectoire pour thread %d\n", thread_id);
-			// Les autres threads continueront, mais ce thread ne pourra pas travailler
-		}
-		
-		// Boucle séquentielle des chunks (chaque thread traite tous les chunks)
-		for (int chunk = 0; chunk < num_chunks; chunk++) {
-			// Vérifier l'annulation AVANT de commencer chaque chunk
-			// Un seul thread vérifie pour éviter les appels multiples
-			#pragma omp master
-			{
-				if (check_events_and_cancel()) {
-					printf("Calcul Buddhabrot annulé par l'utilisateur (chunk %d)\n", chunk);
-					cancelled = 1;
+
+		if (trajX != NULL && trajY != NULL) {
+			while (!cancelled) {
+				// Prendre un échantillon atomiquement
+				int my_sample;
+				#pragma omp atomic capture
+				my_sample = sample_counter++;
+
+				// Vérifier si on a dépassé le nombre total
+				if (my_sample >= numSamples) {
+					break;
 				}
-			}
-			
-			// Synchroniser cancelled immédiatement après la vérification
-			#pragma omp flush(cancelled)
-			
-			// Si annulé, sortir de la boucle des chunks IMMÉDIATEMENT
-			if (cancelled) break;
-			
-			// Synchroniser tous les threads avant de continuer (seulement si pas annulé)
-			#pragma omp barrier
-			
-			int chunk_start = chunk * chunk_size;
-			int chunk_end = (chunk_start + chunk_size < numSamples) ? chunk_start + chunk_size : numSamples;
-			
-			// Vérifier l'annulation avant de commencer le traitement parallèle
-			// (vérification déjà faite avant la barrière, mais on s'assure que cancelled est à jour)
-			#pragma omp flush(cancelled)
-			if (cancelled) break;  // Sortie immédiate si annulé
-			
-			// Traitement parallèle des échantillons dans ce chunk
-			// Utiliser un compteur atomique partagé pour permettre une sortie immédiate
-			if (trajX != NULL && trajY != NULL && !cancelled) {
-				// Initialiser le compteur partagé pour ce chunk
-				#pragma omp master
-				{
-					sample_counter_shared = chunk_start;
-				}
-				#pragma omp barrier  // Attendre que le master initialise
-				
-				// Boucle while avec répartition manuelle du travail (permet sortie immédiate)
-				// Pas de barrière ici - chaque thread commence immédiatement
-				while (1) {
-					// Vérifier cancelled AVANT de prendre un échantillon (à chaque itération)
-					#pragma omp flush(cancelled)
-					if (cancelled) {
-						break;  // Sortie immédiate possible avec while
-					}
-					
-					// Prendre un échantillon de manière atomique
-					int sample = -1;
-					#pragma omp critical(get_sample)
-					{
-						if (sample_counter_shared < chunk_end) {
-							sample = sample_counter_shared;
-							sample_counter_shared++;
-						}
-					}
-					
-					// Si on a atteint la fin, sortir
-					if (sample < 0 || sample >= chunk_end) {
+
+				// Thread 0 uniquement : vérifier les événements tous les 500 échantillons
+				if (thread_id == 0 && my_sample % 500 == 0) {
+					if (check_events_and_cancel()) {
+						printf("Calcul Buddhabrot annulé par l'utilisateur\n");
+						cancelled = 1;
 						break;
 					}
-					
-					// Vérifier cancelled après avoir pris l'échantillon
-					#pragma omp flush(cancelled)
-					if (cancelled) {
+					// Mise à jour de la progression
+					if (guiPtr != NULL) {
+						int percent = (my_sample * 90) / numSamples;
+						if (percent > 90) percent = 90;
+						SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, "Buddhabrot");
+					}
+				}
+
+				// Générer un point c aléatoire
+				seed = seed * 1103515245 + 12345;
+				double xg = ((double)(seed & 0x7FFFFFFF) / 2147483647.0) * xrange + xmin;
+				seed = seed * 1103515245 + 12345;
+				double yg = ((double)(seed & 0x7FFFFFFF) / 2147483647.0) * yrange + ymin;
+
+				complex c = MakeComplex(xg, yg);
+				complex z = ZeroSetofComplex();
+
+				// Itérer et stocker la trajectoire
+				int escaped = 0;
+				int iter;
+				double mag2_z = 0.0;
+				int early_exit_threshold = (iterMax < 50) ? iterMax / 2 : 50;
+
+				for (iter = 0; iter < iterMax; iter++) {
+					// Vérifier cancelled périodiquement
+					if (iter % 50 == 0 && cancelled) break;
+
+					complex zTemp = Mulz(z, z);
+					z = Addz(zTemp, c);
+
+					double zx = Rez(z);
+					double zy = Imz(z);
+					if (isnan(zx) || isnan(zy) || isinf(zx) || isinf(zy)) {
 						break;
 					}
-					
-					// Vérifier les événements TRÈS fréquemment (tous les échantillons pour les premiers, puis tous les 3)
-					// pour détection maximale - vérifier à chaque itération pour les 10 premiers échantillons
-					if (sample < chunk_start + 10 || sample % 3 == 0) {
-						#pragma omp critical(check_cancel)
-						{
-							// Toujours vérifier les événements
-							if (check_events_and_cancel()) {
-								cancelled = 1;
-								printf("Calcul Buddhabrot annulé par l'utilisateur (chunk %d, sample %d)\n", chunk, sample);
-							}
-						}
-						#pragma omp flush(cancelled)
-						if (cancelled) {
-							break;
-						}
-					}
-					
-					// Vérifier cancelled une dernière fois avant de commencer le calcul
-					#pragma omp flush(cancelled)
-					if (cancelled) {
+
+					mag2_z = zx * zx + zy * zy;
+
+					if (iter == early_exit_threshold && mag2_z < 0.25) {
 						break;
 					}
-					
-					// Générer un point c aléatoire (thread-safe)
-					// Utiliser une fonction de hash simple (LCG) avec seed thread-local
-					seed = seed * 1103515245 + 12345;  // LCG simple
-					double xg = ((double)(seed & 0x7FFFFFFF) / 2147483647.0) * xrange + xmin;
-					seed = seed * 1103515245 + 12345;
-					double yg = ((double)(seed & 0x7FFFFFFF) / 2147483647.0) * yrange + ymin;
-					
-					complex c = MakeComplex(xg, yg);
-					complex z = ZeroSetofComplex();
 
-					// Itérer et stocker la trajectoire avec early exit optimisé
-					int escaped = 0;
-					int iter;
-					double mag2_z = 0.0;  // Cache pour Magz(z)^2 pour éviter recalculs
-					
-					// Early exit : si après quelques itérations le point ne s'échappe pas,
-					// il est probablement dans l'ensemble de Mandelbrot
-					int early_exit_threshold = (iterMax < 50) ? iterMax / 2 : 50;
-					
-					for (iter = 0; iter < iterMax; iter++) {
-						// Vérifier cancelled TRÈS fréquemment dans la boucle d'itération (tous les 3 itérations)
-						// pour permettre l'annulation même pendant les calculs très longs
-						if (iter % 3 == 0) {
-							// Flush cancelled pour s'assurer qu'on voit la valeur à jour
-							#pragma omp flush(cancelled)
-							if (cancelled) {
-								break;
-							}
-						}
-						
-						// Vérifier cancelled aussi avant les opérations coûteuses
-						if (cancelled) {
-							break;
-						}
-						
-						complex zTemp = Mulz(z, z);
-						z = Addz(zTemp, c);
+					trajX[iter] = zx;
+					trajY[iter] = zy;
 
-						// Vérifier NaN/Inf avant de stocker
-						double zx = Rez(z);
-						double zy = Imz(z);
-						if (isnan(zx) || isnan(zy) || isinf(zx) || isinf(zy)) {
-							break;  // Arrêter si valeur invalide
-						}
-
-						// Calculer mag2 une seule fois
-						mag2_z = zx * zx + zy * zy;
-						
-						// Early exit : si après plusieurs itérations, le point est encore proche de l'origine,
-						// il ne s'échappera probablement pas
-						if (iter == early_exit_threshold && mag2_z < 0.25) {
-							break;  // Probablement dans l'ensemble, arrêter
-						}
-
-						trajX[iter] = zx;
-						trajY[iter] = zy;
-
-						if (mag2_z > bailout * bailout) {  // Comparer mag2 au lieu de Magz()
-							escaped = 1;
-							break;
-						}
+					if (mag2_z > bailout * bailout) {
+						escaped = 1;
+						break;
 					}
+				}
 
-					// Si le point s'échappe, tracer sa trajectoire
-					if (escaped && iter > 0) {
-						// Précalculer les constantes pour éviter les divisions répétées
-						double inv_xrange = 1.0 / xrange;
-						double inv_yrange = 1.0 / yrange;
-						double scale_x = xpixel * inv_xrange;
-						double scale_y = ypixel * inv_yrange;
-						
-						for (int traj_idx = 0; traj_idx < iter; traj_idx++) {
-							// Vérifier que les valeurs sont valides
-							if (isnan(trajX[traj_idx]) || isnan(trajY[traj_idx]) ||
-							    isinf(trajX[traj_idx]) || isinf(trajY[traj_idx])) {
-								continue;  // Ignorer les valeurs invalides
-							}
+				// Si le point s'échappe, tracer sa trajectoire
+				if (escaped && iter > 0 && !cancelled) {
+					double scale_x = xpixel / xrange;
+					double scale_y = ypixel / yrange;
 
-							// Convertir coordonnées complexes en pixels (optimisé avec précalculs)
-							double px_d = (trajX[traj_idx] - xmin) * scale_x;
-							double py_d = (trajY[traj_idx] - ymin) * scale_y;
-							
-							// Vérifier les limites avant conversion
-							if (px_d < 0.0 || px_d >= (double)xpixel || 
-							    py_d < 0.0 || py_d >= (double)ypixel) {
-								continue;  // Ignorer les pixels hors limites
-							}
-
-							int px = (int)px_d;
-							int py = (int)py_d;
-
-							// Double vérification des limites (protection supplémentaire)
-							if (px >= 0 && px < xpixel && py >= 0 && py < ypixel) {
-								int idx = py * xpixel + px;
-								if (idx >= 0 && idx < xpixel * ypixel) {
-									#pragma omp atomic
-									f->fmatrix[idx]++;
-								}
-							}
+					for (int traj_idx = 0; traj_idx < iter; traj_idx++) {
+						if (isnan(trajX[traj_idx]) || isnan(trajY[traj_idx]) ||
+						    isinf(trajX[traj_idx]) || isinf(trajY[traj_idx])) {
+							continue;
 						}
-					}
-				}  // Fin de la boucle while pour les échantillons
-			}
-			
-			// Synchroniser tous les threads avant le rendu progressif
-			#pragma omp barrier
-			
-			// Vérifier cancelled après la barrière (tous les threads synchronisés)
-			if (cancelled) break;
-			
-			// Rendu progressif par un seul thread (évite les conflits)
-			#pragma omp master
-			{
-				// Après chaque chunk : normaliser, coloriser et afficher progressivement
-				// Ne rendre que tous les N chunks pour améliorer les performances
-				// (rendre moins fréquemment réduit le temps total)
-				if (chunk % 2 == 0 || chunk == num_chunks - 1) {  // Rendre tous les 2 chunks + le dernier
-					// Trouver la densité maximale actuelle
-					maxDensity = 1;
-					for (i = 0; i < xpixel * ypixel; i++) {
-						if (f->fmatrix[i] > maxDensity) {
-							maxDensity = f->fmatrix[i];
-						}
-					}
-					
-					// Convertir densité en couleurs et afficher progressivement
-					if (maxDensity > 0) {
-						double logMaxDensity = log(1.0 + (double)maxDensity);
-						// Protection contre division par zéro ou logMaxDensity invalide
-						if (logMaxDensity > 0.0 && !isnan(logMaxDensity) && !isinf(logMaxDensity)) {
-							const gradient_table* gradient = Colorization_GetPalette(f->colorMode);
-							if (gradient != NULL) {
-								// Précalculer 1/logMaxDensity pour éviter les divisions répétées
-								double inv_logMaxDensity = 1.0 / logMaxDensity;
-								
-								// Afficher toutes les 20 lignes pour performance (au lieu de 10)
-								for (j = 0; j < ypixel; j++) {
-									for (i = 0; i < xpixel; i++) {
-										int idx = j * xpixel + i;
-										if (idx >= 0 && idx < xpixel * ypixel) {
-											double density = (double)f->fmatrix[idx];
-											double normalized = log(1.0 + density) * inv_logMaxDensity;
-											
-											// Clamper la valeur normalisée entre 0 et 1
-											if (normalized < 0.0) normalized = 0.0;
-											else if (normalized > 1.0) normalized = 1.0;
-											if (isnan(normalized) || isinf(normalized)) normalized = 0.0;
 
-											colorization_color cc = Gradient_Interpolate(gradient, normalized);
-											/* Update cmatrix for consistency */
-											f->cmatrix[idx].r = cc.r;
-											f->cmatrix[idx].g = cc.g;
-											f->cmatrix[idx].b = cc.b;
-											f->cmatrix[idx].a = 255;
-											pixelRGBA(canvas, (Sint16)(i + decalageX), (Sint16)(j + decalageY),
-											          cc.r, cc.g, cc.b, 255);
-										}
-									}
-									// Mise à jour partielle tous les 20 lignes (au lieu de 10)
-									if (j % 20 == 0 || j == ypixel - 1) {
-										SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
-									}
-								}
+						double px_d = (trajX[traj_idx] - xmin) * scale_x;
+						double py_d = (trajY[traj_idx] - ymin) * scale_y;
+
+						if (px_d < 0.0 || px_d >= (double)xpixel ||
+						    py_d < 0.0 || py_d >= (double)ypixel) {
+							continue;
+						}
+
+						int px = (int)px_d;
+						int py = (int)py_d;
+
+						if (px >= 0 && px < xpixel && py >= 0 && py < ypixel) {
+							int idx = py * xpixel + px;
+							if (idx >= 0 && idx < xpixel * ypixel) {
+								#pragma omp atomic
+								f->fmatrix[idx]++;
 							}
 						}
 					}
 				}
-				
-				// Mise à jour de la progression
-				if (guiPtr != NULL) {
-					int percent = ((chunk + 1) * 90) / num_chunks; // 90% pour l'échantillonnage
-					SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, "Buddhabrot");
-				}
 			}
-			
-			// Synchroniser tous les threads avant de passer au chunk suivant
-			#pragma omp barrier
 		}
-		
-		// Libérer les allocations thread-local à la fin de la région parallèle
-		if (trajX != NULL) {
-			free(trajX);
+
+		// Libérer les buffers
+		if (trajX != NULL) free(trajX);
+		if (trajY != NULL) free(trajY);
+	} // Fin de la région parallèle
+
+	// Message si annulé
+	if (cancelled) {
+		printf("Buddhabrot: calcul interrompu à %d/%d échantillons\n", sample_counter, numSamples);
+	}
+
+	// Rendu final : normaliser et coloriser
+	maxDensity = 1;
+	for (i = 0; i < xpixel * ypixel; i++) {
+		if (f->fmatrix[i] > maxDensity) {
+			maxDensity = f->fmatrix[i];
 		}
-		if (trajY != NULL) {
-			free(trajY);
+	}
+
+	if (maxDensity > 0) {
+		double logMaxDensity = log(1.0 + (double)maxDensity);
+		if (logMaxDensity > 0.0 && !isnan(logMaxDensity) && !isinf(logMaxDensity)) {
+			const gradient_table* gradient = Colorization_GetPalette(f->colorMode);
+			if (gradient != NULL) {
+				double inv_logMaxDensity = 1.0 / logMaxDensity;
+				for (j = 0; j < ypixel; j++) {
+					for (i = 0; i < xpixel; i++) {
+						int idx = j * xpixel + i;
+						if (idx >= 0 && idx < xpixel * ypixel) {
+							double density = (double)f->fmatrix[idx];
+							double normalized = log(1.0 + density) * inv_logMaxDensity;
+							if (normalized < 0.0) normalized = 0.0;
+							else if (normalized > 1.0) normalized = 1.0;
+							if (isnan(normalized) || isinf(normalized)) normalized = 0.0;
+
+							colorization_color cc = Gradient_Interpolate(gradient, normalized);
+							f->cmatrix[idx].r = cc.r;
+							f->cmatrix[idx].g = cc.g;
+							f->cmatrix[idx].b = cc.b;
+							f->cmatrix[idx].a = 255;
+							pixelRGBA(canvas, (Sint16)(i + decalageX), (Sint16)(j + decalageY),
+							          cc.r, cc.g, cc.b, 255);
+						}
+					}
+				}
+				SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
+			}
 		}
-	} // Fin région parallèle (créée UNE SEULE FOIS)
+	}
 #else
 	// Version séquentielle
 	double *trajX = (double*) malloc(iterMax * sizeof(double));
