@@ -95,15 +95,7 @@ All palettes use continuous iteration interpolation based on |z| to eliminate vi
 
 ## Screenshots
 
-Press **S** to save the current view as `Screenshot.bmp`.
-
-## License
-
-GPL-2.0 - See LICENSE file for details.
-
-## Version History
-
-- **1.0** (2025) - Added Lyapunov fractal, expanded color palettes, improved rendering
+Press **S** to save the current vz fractal, expanded color palettes, improved rendering
 - **0.5.1** (2025) - Added smooth coloring, status bar, bug fixes
 - **0.5** (2003) - Initial release
 

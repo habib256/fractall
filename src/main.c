@@ -209,11 +209,21 @@ main (int argc, char *argv[])
     {
 		// Trace de la mendelbrot
     case 1:
-		VonKochDraw (screen,0,win.y1,win.w,win.y2, iteration);	// Trace de Von koch
+		{
+			Uint32 time = SDL_GetTicks();
+			VonKochDraw (screen,0,win.y1,win.w,win.y2, iteration);	// Trace de Von koch
+			time = SDL_GetTicks() - time;
+			if (useGui) SDLGUI_StateBar_UpdateVectorial(screen, &g, typeFractale, iteration, 8, time);
+		}
 		break;
 		
     case 2:
-		DragonFractDraw (screen,0,win.y1,win.w,win.y2, iteration);	// Trace du Dragon
+		{
+			Uint32 time = SDL_GetTicks();
+			DragonFractDraw (screen,0,win.y1,win.w,win.y2, iteration);	// Trace du Dragon
+			time = SDL_GetTicks() - time;
+			if (useGui) SDLGUI_StateBar_UpdateVectorial(screen, &g, typeFractale, iteration, 20, time);
+		}
 		break;
     default:
     		Fractal_ChangeType (&f, typeFractale);
@@ -415,7 +425,10 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				*iteration = 1;
 				if (g != NULL) g->selectedType = 1;
 				if (g != NULL) SDLGUI_Draw (screen, g);
+				Uint32 time = SDL_GetTicks();
 				VonKochDraw (screen,0,win.y1,win.w,win.y2, *iteration);	// Trace de Von koch
+				time = SDL_GetTicks() - time;
+				if (g != NULL) SDLGUI_StateBar_UpdateVectorial(screen, g, *typeFractale, *iteration, 8, time);
 			}
 
 			if (event->key.keysym.sym == SDLK_F2)
@@ -424,7 +437,10 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				*iteration = 4;
 				if (g != NULL) g->selectedType = 2;
 				if (g != NULL) SDLGUI_Draw (screen, g);
+				Uint32 time = SDL_GetTicks();
 				DragonFractDraw (screen,0,win.y1,win.w,win.y2, *iteration);	// Trace du Dragon
+				time = SDL_GetTicks() - time;
+				if (g != NULL) SDLGUI_StateBar_UpdateVectorial(screen, g, *typeFractale, *iteration, 20, time);
 			}
 
 			if (event->key.keysym.sym == SDLK_F3)
@@ -563,14 +579,24 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					SDLGUI_Draw (screen, g);  // Redessiner le GUI avec le nouveau cadre
 					switch (*typeFractale) {
 					case 1:
+					{
 					*typeFractale =1;
 					*iteration = 1;
+					Uint32 time = SDL_GetTicks();
 					VonKochDraw (screen,0,win.y1,win.w,win.y2, *iteration);
+					time = SDL_GetTicks() - time;
+					SDLGUI_StateBar_UpdateVectorial(screen, g, *typeFractale, *iteration, 8, time);
+					}
 					break;
 					case 2:
+					{
 					*typeFractale =2;
 					*iteration = 4;
+					Uint32 time = SDL_GetTicks();
 					DragonFractDraw (screen,0,win.y1,win.w,win.y2, *iteration);
+					time = SDL_GetTicks() - time;
+					SDLGUI_StateBar_UpdateVectorial(screen, g, *typeFractale, *iteration, 20, time);
+					}
 					break;
 					case 16:
 					{
@@ -659,8 +685,11 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 						*iteration = *iteration + 1;
 					
 					if (i != *iteration) {
+						Uint32 time = SDL_GetTicks();
 						VonKochDraw (screen,0,win.y1,win.w,win.y2, *iteration);	// Trace de Von koch
-						printf ("Draw VonKoch with %d iteration\n",*iteration);
+						time = SDL_GetTicks() - time;
+						printf ("Draw VonKoch with %d iteration in %d ms\n",*iteration, time);
+						if (g != NULL) SDLGUI_StateBar_UpdateVectorial(screen, g, *typeFractale, *iteration, 8, time);
 					}
 					
 				}
@@ -677,13 +706,11 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 						*iteration = *iteration + 1;
 					
 					if (i != *iteration) {
-						Uint32 time; // Test de temps de calcul en ms
-						
-						time = SDL_GetTicks();
+						Uint32 time = SDL_GetTicks();
 						DragonFractDraw (screen,0,win.y1,win.w,win.y2, *iteration);	// Trace du Dragon
 						time = SDL_GetTicks() - time;
 						printf ("Draw Dragon with %d iteration in %d ms\n",*iteration, time);
-						
+						if (g != NULL) SDLGUI_StateBar_UpdateVectorial(screen, g, *typeFractale, *iteration, 20, time);
 					}
 					
 				}

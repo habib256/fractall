@@ -3432,7 +3432,246 @@ static double Lyapunov_GetNormalizedValue(double lyap) {
 /* Fonction générique de rendu pour Lyapunov avec séquence paramétrable
  * Calcule l'exposant de Lyapunov de la suite logistique x_{n+1} = r_n * x_n * (1 - x_n)
  * avec r alternant entre a (x) et b (y) selon la séquence fournie
+ *
+ * OPTIMISATIONS v2:
+ * - Pré-calcul de la séquence en tableau de booléens (évite strcmp à chaque itération)
+ * - Déroulage de boucle par blocs de seqLen (élimine le modulo coûteux)
+ * - Accumulation par blocs avec un seul log() tous les LYAP_BLOCK_SIZE éléments
+ * - Version SIMD optionnelle pour traiter 2/4 pixels en parallèle
  */
+
+#define LYAP_MAX_SEQ_LEN 64     // Longueur max de la séquence
+#define LYAP_BLOCK_SIZE  64     // Taille de bloc pour accumulation log (évite overflow/underflow)
+#define LYAP_MIN_DERIV   1e-10  // Seuil minimum pour la dérivée
+#define LYAP_MIN_X       0.0001 // Seuil minimum pour x
+#define LYAP_MAX_X       0.9999 // Seuil maximum pour x
+
+/* Calcul optimisé de l'exposant de Lyapunov pour un pixel
+ * Utilise l'accumulation par blocs pour réduire les appels à log()
+ */
+static inline double Lyapunov_ComputeExponent_Optimized(
+    double a, double b,
+    const int* seq_is_a,      // Tableau pré-calculé : 1 si 'A', 0 si 'B'
+    int seqLen,
+    int warmup,
+    int iterMax)
+{
+    double x = 0.5;
+    double lyap = 0.0;
+    int n, block_count;
+    
+    // Phase de stabilisation (warmup) - déroulée par seqLen
+    int warmup_full_cycles = warmup / seqLen;
+    int warmup_remainder = warmup % seqLen;
+    
+    for (int cycle = 0; cycle < warmup_full_cycles; cycle++) {
+        for (int s = 0; s < seqLen; s++) {
+            double r = seq_is_a[s] ? a : b;
+            x = r * x * (1.0 - x);
+        }
+        // Réinitialiser si divergence
+        if (x < LYAP_MIN_X || x > LYAP_MAX_X) x = 0.5;
+    }
+    for (int s = 0; s < warmup_remainder; s++) {
+        double r = seq_is_a[s] ? a : b;
+        x = r * x * (1.0 - x);
+    }
+    if (x < LYAP_MIN_X || x > LYAP_MAX_X) x = 0.5;
+    
+    // Calcul de l'exposant de Lyapunov avec accumulation par blocs
+    // On accumule le produit des dérivées sur LYAP_BLOCK_SIZE itérations
+    // puis on fait un seul log() par bloc
+    
+    int total_blocks = iterMax / LYAP_BLOCK_SIZE;
+    int remainder = iterMax % LYAP_BLOCK_SIZE;
+    int seq_idx = 0;  // Index dans la séquence
+    
+    for (block_count = 0; block_count < total_blocks; block_count++) {
+        double product = 1.0;
+        int valid_count = 0;
+        
+        for (n = 0; n < LYAP_BLOCK_SIZE; n++) {
+            double r = seq_is_a[seq_idx] ? a : b;
+            x = r * x * (1.0 - x);
+            
+            double deriv = fabs(r * (1.0 - 2.0 * x));
+            if (deriv > LYAP_MIN_DERIV) {
+                product *= deriv;
+                valid_count++;
+            }
+            
+            // Réinitialiser si divergence
+            if (x < LYAP_MIN_X || x > LYAP_MAX_X) x = 0.5;
+            
+            // Avancer dans la séquence (évite modulo)
+            seq_idx++;
+            if (seq_idx >= seqLen) seq_idx = 0;
+        }
+        
+        // Un seul log par bloc
+        if (valid_count > 0 && product > 0.0) {
+            lyap += log(product);
+        }
+    }
+    
+    // Traiter les itérations restantes
+    if (remainder > 0) {
+        double product = 1.0;
+        int valid_count = 0;
+        
+        for (n = 0; n < remainder; n++) {
+            double r = seq_is_a[seq_idx] ? a : b;
+            x = r * x * (1.0 - x);
+            
+            double deriv = fabs(r * (1.0 - 2.0 * x));
+            if (deriv > LYAP_MIN_DERIV) {
+                product *= deriv;
+                valid_count++;
+            }
+            
+            if (x < LYAP_MIN_X || x > LYAP_MAX_X) x = 0.5;
+            
+            seq_idx++;
+            if (seq_idx >= seqLen) seq_idx = 0;
+        }
+        
+        if (valid_count > 0 && product > 0.0) {
+            lyap += log(product);
+        }
+    }
+    
+    // Normaliser par le nombre d'itérations
+    return (iterMax > 0) ? (lyap / iterMax) : 0.0;
+}
+
+#ifdef HAVE_SSE4_1
+#include <smmintrin.h>
+
+/* Version SSE4.1 : traite 2 pixels en parallèle (packed double) */
+static inline void Lyapunov_ComputeExponent_SSE(
+    double a0, double b0,  // Pixel 0
+    double a1, double b1,  // Pixel 1
+    const int* seq_is_a,
+    int seqLen,
+    int warmup,
+    int iterMax,
+    double* lyap_out0,
+    double* lyap_out1)
+{
+    __m128d x = _mm_set1_pd(0.5);
+    __m128d lyap = _mm_setzero_pd();
+    __m128d one = _mm_set1_pd(1.0);
+    __m128d two = _mm_set1_pd(2.0);
+    __m128d min_deriv = _mm_set1_pd(LYAP_MIN_DERIV);
+    __m128d min_x = _mm_set1_pd(LYAP_MIN_X);
+    __m128d max_x = _mm_set1_pd(LYAP_MAX_X);
+    __m128d half = _mm_set1_pd(0.5);
+    
+    __m128d a_vec = _mm_set_pd(a1, a0);
+    __m128d b_vec = _mm_set_pd(b1, b0);
+    
+    // Phase de warmup
+    for (int n = 0; n < warmup; n++) {
+        int s = n % seqLen;
+        __m128d r = seq_is_a[s] ? a_vec : b_vec;
+        __m128d one_minus_x = _mm_sub_pd(one, x);
+        x = _mm_mul_pd(_mm_mul_pd(r, x), one_minus_x);
+    }
+    // Réinitialiser si hors limites
+    __m128d too_low = _mm_cmplt_pd(x, min_x);
+    __m128d too_high = _mm_cmpgt_pd(x, max_x);
+    __m128d out_of_range = _mm_or_pd(too_low, too_high);
+    x = _mm_blendv_pd(x, half, out_of_range);
+    
+    // Calcul principal par blocs
+    int total_blocks = iterMax / LYAP_BLOCK_SIZE;
+    int remainder = iterMax % LYAP_BLOCK_SIZE;
+    int seq_idx = 0;
+    
+    for (int block = 0; block < total_blocks; block++) {
+        __m128d product = one;
+        
+        for (int n = 0; n < LYAP_BLOCK_SIZE; n++) {
+            __m128d r = seq_is_a[seq_idx] ? a_vec : b_vec;
+            __m128d one_minus_x = _mm_sub_pd(one, x);
+            x = _mm_mul_pd(_mm_mul_pd(r, x), one_minus_x);
+            
+            // deriv = |r * (1 - 2*x)|
+            __m128d two_x = _mm_mul_pd(two, x);
+            __m128d one_minus_2x = _mm_sub_pd(one, two_x);
+            __m128d deriv = _mm_mul_pd(r, one_minus_2x);
+            // Valeur absolue via AND avec masque (clear sign bit)
+            __m128d abs_mask = _mm_castsi128_pd(_mm_set1_epi64x(0x7FFFFFFFFFFFFFFFLL));
+            deriv = _mm_and_pd(deriv, abs_mask);
+            
+            // Accumuler seulement si deriv > min_deriv
+            __m128d valid = _mm_cmpgt_pd(deriv, min_deriv);
+            __m128d safe_deriv = _mm_blendv_pd(one, deriv, valid);
+            product = _mm_mul_pd(product, safe_deriv);
+            
+            // Réinitialiser si divergence
+            too_low = _mm_cmplt_pd(x, min_x);
+            too_high = _mm_cmpgt_pd(x, max_x);
+            out_of_range = _mm_or_pd(too_low, too_high);
+            x = _mm_blendv_pd(x, half, out_of_range);
+            
+            seq_idx++;
+            if (seq_idx >= seqLen) seq_idx = 0;
+        }
+        
+        // Log du produit (scalaire, pas de log SIMD en SSE)
+        double prod0, prod1;
+        _mm_storel_pd(&prod0, product);
+        _mm_storeh_pd(&prod1, product);
+        if (prod0 > 0.0) lyap = _mm_add_pd(lyap, _mm_set_pd(0.0, log(prod0)));
+        if (prod1 > 0.0) lyap = _mm_add_pd(lyap, _mm_set_pd(log(prod1), 0.0));
+    }
+    
+    // Itérations restantes
+    if (remainder > 0) {
+        __m128d product = one;
+        
+        for (int n = 0; n < remainder; n++) {
+            __m128d r = seq_is_a[seq_idx] ? a_vec : b_vec;
+            __m128d one_minus_x = _mm_sub_pd(one, x);
+            x = _mm_mul_pd(_mm_mul_pd(r, x), one_minus_x);
+            
+            __m128d two_x = _mm_mul_pd(two, x);
+            __m128d one_minus_2x = _mm_sub_pd(one, two_x);
+            __m128d deriv = _mm_mul_pd(r, one_minus_2x);
+            __m128d abs_mask = _mm_castsi128_pd(_mm_set1_epi64x(0x7FFFFFFFFFFFFFFFLL));
+            deriv = _mm_and_pd(deriv, abs_mask);
+            
+            __m128d valid = _mm_cmpgt_pd(deriv, min_deriv);
+            __m128d safe_deriv = _mm_blendv_pd(one, deriv, valid);
+            product = _mm_mul_pd(product, safe_deriv);
+            
+            too_low = _mm_cmplt_pd(x, min_x);
+            too_high = _mm_cmpgt_pd(x, max_x);
+            out_of_range = _mm_or_pd(too_low, too_high);
+            x = _mm_blendv_pd(x, half, out_of_range);
+            
+            seq_idx++;
+            if (seq_idx >= seqLen) seq_idx = 0;
+        }
+        
+        double prod0, prod1;
+        _mm_storel_pd(&prod0, product);
+        _mm_storeh_pd(&prod1, product);
+        if (prod0 > 0.0) lyap = _mm_add_pd(lyap, _mm_set_pd(0.0, log(prod0)));
+        if (prod1 > 0.0) lyap = _mm_add_pd(lyap, _mm_set_pd(log(prod1), 0.0));
+    }
+    
+    // Normaliser et extraire les résultats
+    double inv_iterMax = (iterMax > 0) ? (1.0 / iterMax) : 0.0;
+    __m128d scale = _mm_set1_pd(inv_iterMax);
+    lyap = _mm_mul_pd(lyap, scale);
+    
+    _mm_storel_pd(lyap_out0, lyap);
+    _mm_storeh_pd(lyap_out1, lyap);
+}
+#endif /* HAVE_SSE4_1 */
+
 static Uint32 Lyapunov_Draw_Sequence (SDL_Surface *canvas, fractal* f, int decalageX, int decalageY, void* guiPtr, const char* sequence, const char* fractalName) {
 	int i, j;
 	double xStep, yStep;
@@ -3442,12 +3681,22 @@ static Uint32 Lyapunov_Draw_Sequence (SDL_Surface *canvas, fractal* f, int decal
 	int iterMax = f->iterationMax;
 	int xpixel = f->xpixel;
 	int ypixel = f->ypixel;
+	
+	// Pré-calculer la séquence en tableau de booléens (optimisation)
+	int seq_is_a[LYAP_MAX_SEQ_LEN];
+	if (seqLen > LYAP_MAX_SEQ_LEN) seqLen = LYAP_MAX_SEQ_LEN;
+	for (int s = 0; s < seqLen; s++) {
+		seq_is_a[s] = (sequence[s] == 'A' || sequence[s] == 'a') ? 1 : 0;
+	}
 
 	time = SDL_GetTicks();
-	printf("Calculating %s fractal (sequence: %s)...\n", fractalName, sequence);
+	printf("Calculating %s fractal (sequence: %s, optimized v2)...\n", fractalName, sequence);
 	printf("Domain: x=[%.6f, %.6f] y=[%.6f, %.6f]\n", f->xmin, f->xmax, f->ymin, f->ymax);
 #ifdef HAVE_OPENMP
 	printf("Using OpenMP with %d threads\n", omp_get_max_threads());
+#endif
+#ifdef HAVE_SSE4_1
+	printf("Using SSE4.1 SIMD optimization (2 pixels/op)\n");
 #endif
 
 	xStep = (f->xmax - f->xmin) / xpixel;
@@ -3467,60 +3716,55 @@ static Uint32 Lyapunov_Draw_Sequence (SDL_Surface *canvas, fractal* f, int decal
 	for (int chunk_start = 0; chunk_start < ypixel && !cancelled; chunk_start += chunk_height) {
 		int chunk_end = (chunk_start + chunk_height < ypixel) ? chunk_start + chunk_height : ypixel;
 
-		#pragma omp parallel for private(i) schedule(dynamic, 16)
+		#pragma omp parallel for private(i) schedule(dynamic, 8)
 		for (j = chunk_start; j < chunk_end; j++) {
 			double b = f->ymin + j * yStep;  // Paramètre b sur l'axe Y
 
+#ifdef HAVE_SSE4_1
+			// Version SSE : traiter 2 pixels à la fois
+			for (i = 0; i < xpixel - 1; i += 2) {
+				double a0 = f->xmin + i * xStep;
+				double a1 = f->xmin + (i + 1) * xStep;
+				double lyap0, lyap1;
+				
+				Lyapunov_ComputeExponent_SSE(a0, b, a1, b, seq_is_a, seqLen,
+				                              warmup, iterMax, &lyap0, &lyap1);
+				
+				// Pixel 0
+				double norm0 = Lyapunov_GetNormalizedValue(lyap0);
+				f->fmatrix[j * xpixel + i] = (int)(norm0 * iterMax);
+				f->zmatrix[j * xpixel + i].x = norm0 * 2.0;
+				f->zmatrix[j * xpixel + i].y = 0.0;
+				
+				// Pixel 1
+				double norm1 = Lyapunov_GetNormalizedValue(lyap1);
+				f->fmatrix[j * xpixel + i + 1] = (int)(norm1 * iterMax);
+				f->zmatrix[j * xpixel + i + 1].x = norm1 * 2.0;
+				f->zmatrix[j * xpixel + i + 1].y = 0.0;
+			}
+			// Traiter le dernier pixel si xpixel est impair
+			if (xpixel & 1) {
+				i = xpixel - 1;
+				double a = f->xmin + i * xStep;
+				double lyap = Lyapunov_ComputeExponent_Optimized(a, b, seq_is_a, seqLen, warmup, iterMax);
+				double norm = Lyapunov_GetNormalizedValue(lyap);
+				f->fmatrix[j * xpixel + i] = (int)(norm * iterMax);
+				f->zmatrix[j * xpixel + i].x = norm * 2.0;
+				f->zmatrix[j * xpixel + i].y = 0.0;
+			}
+#else
+			// Version scalaire optimisée
 			for (i = 0; i < xpixel; i++) {
 				double a = f->xmin + i * xStep;  // Paramètre a sur l'axe X
-				double x = 0.5;  // Valeur initiale classique
-				double lyap = 0.0;
-				double r;
-				int n;
-
-				// Phase de stabilisation (warmup)
-				for (n = 0; n < warmup; n++) {
-					r = (sequence[n % seqLen] == 'A') ? a : b;
-					x = r * x * (1.0 - x);
-					if (x < 0.0001 || x > 0.9999) x = 0.5;  // Éviter les divergences
-				}
-
-				// Calcul de l'exposant de Lyapunov
-				for (n = 0; n < iterMax; n++) {
-					r = (sequence[n % seqLen] == 'A') ? a : b;
-					x = r * x * (1.0 - x);
-
-					// Éviter log(0) et les valeurs invalides
-					double deriv = fabs(r * (1.0 - 2.0 * x));
-					if (deriv > 0.0001) {
-						lyap += log(deriv);
-					}
-
-					// Réinitialiser si x diverge
-					if (x < 0.0001 || x > 0.9999) {
-						x = 0.5;
-					}
-				}
-
-				// Protection contre division par zéro
-				if (iterMax > 0) {
-					lyap /= iterMax;
-				} else {
-					lyap = 0.0;  // Valeur par défaut si iterMax est invalide
-				}
-
-				// Convertir l'exposant en valeur normalisée pour les palettes
+				
+				double lyap = Lyapunov_ComputeExponent_Optimized(a, b, seq_is_a, seqLen, warmup, iterMax);
 				double normalizedValue = Lyapunov_GetNormalizedValue(lyap);
-
-				// Stocker la valeur normalisée dans fmatrix comme "nombre d'itérations"
+				
 				f->fmatrix[j * xpixel + i] = (int)(normalizedValue * iterMax);
-
-				// Initialiser zmatrix avec une valeur fictive pour les types Lyapunov
-				complex z_fake;
-				z_fake.x = normalizedValue * 2.0;  // Valeur entre 0 et 2.0
-				z_fake.y = 0.0;
-				f->zmatrix[j * xpixel + i] = z_fake;
+				f->zmatrix[j * xpixel + i].x = normalizedValue * 2.0;
+				f->zmatrix[j * xpixel + i].y = 0.0;
 			}
+#endif
 		}
 
 		// Vérifier annulation et mettre à jour progression après chaque chunk
@@ -3535,62 +3779,53 @@ static Uint32 Lyapunov_Draw_Sequence (SDL_Surface *canvas, fractal* f, int decal
 		}
 	}
 #else
+	// Version sans OpenMP (fallback)
 	for (int chunk_start = 0; chunk_start < ypixel && !cancelled; chunk_start += chunk_height) {
 		int chunk_end = (chunk_start + chunk_height < ypixel) ? chunk_start + chunk_height : ypixel;
 
 		for (j = chunk_start; j < chunk_end; j++) {
-			double b = f->ymin + j * yStep;  // Paramètre b sur l'axe Y
+			double b = f->ymin + j * yStep;
 
-			for (i = 0; i < xpixel; i++) {
-				double a = f->xmin + i * xStep;  // Paramètre a sur l'axe X
-				double x = 0.5;  // Valeur initiale classique
-				double lyap = 0.0;
-				double r;
-				int n;
-
-				// Phase de stabilisation (warmup)
-				for (n = 0; n < warmup; n++) {
-					r = (sequence[n % seqLen] == 'A') ? a : b;
-					x = r * x * (1.0 - x);
-					if (x < 0.0001 || x > 0.9999) x = 0.5;  // Éviter les divergences
-				}
-
-				// Calcul de l'exposant de Lyapunov
-				for (n = 0; n < iterMax; n++) {
-					r = (sequence[n % seqLen] == 'A') ? a : b;
-					x = r * x * (1.0 - x);
-
-					// Éviter log(0) et les valeurs invalides
-					double deriv = fabs(r * (1.0 - 2.0 * x));
-					if (deriv > 0.0001) {
-						lyap += log(deriv);
-					}
-
-					// Réinitialiser si x diverge
-					if (x < 0.0001 || x > 0.9999) {
-						x = 0.5;
-					}
-				}
-
-				// Protection contre division par zéro
-				if (iterMax > 0) {
-					lyap /= iterMax;
-				} else {
-					lyap = 0.0;  // Valeur par défaut si iterMax est invalide
-				}
-
-				// Convertir l'exposant en valeur normalisée pour les palettes
-				double normalizedValue = Lyapunov_GetNormalizedValue(lyap);
-
-				// Stocker la valeur normalisée dans fmatrix comme "nombre d'itérations"
-				f->fmatrix[j * xpixel + i] = (int)(normalizedValue * iterMax);
-
-				// Initialiser zmatrix avec une valeur fictive pour les types Lyapunov
-				complex z_fake;
-				z_fake.x = normalizedValue * 2.0;  // Valeur entre 0 et 2.0
-				z_fake.y = 0.0;
-				f->zmatrix[j * xpixel + i] = z_fake;
+#ifdef HAVE_SSE4_1
+			for (i = 0; i < xpixel - 1; i += 2) {
+				double a0 = f->xmin + i * xStep;
+				double a1 = f->xmin + (i + 1) * xStep;
+				double lyap0, lyap1;
+				
+				Lyapunov_ComputeExponent_SSE(a0, b, a1, b, seq_is_a, seqLen,
+				                              warmup, iterMax, &lyap0, &lyap1);
+				
+				double norm0 = Lyapunov_GetNormalizedValue(lyap0);
+				f->fmatrix[j * xpixel + i] = (int)(norm0 * iterMax);
+				f->zmatrix[j * xpixel + i].x = norm0 * 2.0;
+				f->zmatrix[j * xpixel + i].y = 0.0;
+				
+				double norm1 = Lyapunov_GetNormalizedValue(lyap1);
+				f->fmatrix[j * xpixel + i + 1] = (int)(norm1 * iterMax);
+				f->zmatrix[j * xpixel + i + 1].x = norm1 * 2.0;
+				f->zmatrix[j * xpixel + i + 1].y = 0.0;
 			}
+			if (xpixel & 1) {
+				i = xpixel - 1;
+				double a = f->xmin + i * xStep;
+				double lyap = Lyapunov_ComputeExponent_Optimized(a, b, seq_is_a, seqLen, warmup, iterMax);
+				double norm = Lyapunov_GetNormalizedValue(lyap);
+				f->fmatrix[j * xpixel + i] = (int)(norm * iterMax);
+				f->zmatrix[j * xpixel + i].x = norm * 2.0;
+				f->zmatrix[j * xpixel + i].y = 0.0;
+			}
+#else
+			for (i = 0; i < xpixel; i++) {
+				double a = f->xmin + i * xStep;
+				
+				double lyap = Lyapunov_ComputeExponent_Optimized(a, b, seq_is_a, seqLen, warmup, iterMax);
+				double normalizedValue = Lyapunov_GetNormalizedValue(lyap);
+				
+				f->fmatrix[j * xpixel + i] = (int)(normalizedValue * iterMax);
+				f->zmatrix[j * xpixel + i].x = normalizedValue * 2.0;
+				f->zmatrix[j * xpixel + i].y = 0.0;
+			}
+#endif
 		}
 
 		// Vérifier annulation et mettre à jour progression après chaque chunk
@@ -3599,7 +3834,7 @@ static Uint32 Lyapunov_Draw_Sequence (SDL_Surface *canvas, fractal* f, int decal
 			printf("Calcul Lyapunov annulé par l'utilisateur\n");
 		}
 		if (guiPtr != NULL && !cancelled) {
-			int percent = ((chunk_start + chunk_height) * 70) / ypixel;  // Phase 1 = 70%
+			int percent = ((chunk_start + chunk_height) * 70) / ypixel;
 			if (percent > 70) percent = 70;
 			SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
 		}

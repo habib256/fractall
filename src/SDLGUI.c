@@ -419,6 +419,31 @@ void SDLGUI_StateBar_Update (SDL_Surface* screen, gui* g, int type, int colorMod
 	SDL_UpdateRect(screen, 0, g->stateH, g->w, screen->h - g->stateH);
 }
 
+/* Mise à jour de la barre d'état pour les fractales vectorielles (Von Koch, Dragon)
+ * Affiche : Nom | Iter: X/Max | Temps
+ */
+void SDLGUI_StateBar_UpdateVectorial (SDL_Surface* screen, gui* g, int type, int iteration, int iterMax, Uint32 renderTime) {
+	const char* typeName = Fractal_GetTypeName(type);
+	char statusText[256];
+
+	// Redessiner la barre d'état
+	SDLGUI_StateBar_Draw(screen, g);
+
+	// Formater le texte pour fractales vectorielles
+	if (typeName[0] != '\0') {
+		snprintf(statusText, sizeof(statusText), "%s | Iter: %d/%d | %dms",
+			typeName, iteration, iterMax, renderTime);
+	} else {
+		snprintf(statusText, sizeof(statusText), "Type %d | Iter: %d/%d | %dms",
+			type, iteration, iterMax, renderTime);
+	}
+
+	// Afficher le texte principal à gauche
+	stringRGBA(screen, 5, g->stateH + 5, statusText, 0, 0, 0, 255);
+
+	SDL_UpdateRect(screen, 0, g->stateH, g->w, screen->h - g->stateH);
+}
+
 void SDLGUI_StateBar_Progress (SDL_Surface* screen, gui* g, int percent, const char* task) {
 	char progressText[128];
 	int barWidth, barHeight, barX, barY;
