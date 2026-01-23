@@ -5,7 +5,7 @@ A portable fractal explorer written in C using SDL.
 ![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)
 ![Version](https://img.shields.io/badge/version-1.0-green.svg)
 
-![Screnshot](Screenshot6.bmp)
+![Screnshot](Screenshot4.bmp)
 
 ## Features
 
