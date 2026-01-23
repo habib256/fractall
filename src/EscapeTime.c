@@ -73,7 +73,7 @@ fractal Fractal_Init (int screenW, int screenH, int type) {
 	f.last_colorRepeat = -1;
 	// Répétition par défaut selon le type : 40 pour escape-time, 2 pour Lyapunov
 	if (type == 17) {
-		f.colorRepeat = 2;  // 2 répétitions pour Lyapunov
+		f.colorRepeat = 40;  // 40 répétitions par défaut (comme les autres fractales)
 	} else {
 		f.colorRepeat = 40;  // 40 répétitions pour escape-time
 	}
@@ -1947,7 +1947,7 @@ void Fractal_ChangeType (fractal* f, int type) {
 
 	// Définir la répétition par défaut selon le type
 	if (type == 17) {
-		f->colorRepeat = 2;  // 2 répétitions pour Lyapunov
+		f->colorRepeat = 40;  // 40 répétitions par défaut (comme les autres fractales)
 	} else {
 		f->colorRepeat = 40;  // 40 répétitions pour escape-time
 	}

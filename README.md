@@ -111,7 +111,7 @@ fractall [OPTIONS]
 | 7 | SmoothIce | White → Cyan → Blue → Black |
 | 8 | SmoothCosmic | Black → Blue → Turquoise → Yellow → Orange → Red |
 
-All palettes use continuous iteration interpolation to eliminate visible color banding. Gradient repetition adjustable with **R** key (default: 40 for escape-time, 2 for Lyapunov).
+All palettes use continuous iteration interpolation to eliminate visible color banding. Gradient repetition adjustable with **R** key (default: 40).
 
 ## Screenshots
 

@@ -112,7 +112,7 @@ src/
 | 7 | SmoothIce | Blanc → Cyan → Bleu → Noir |
 | 8 | SmoothCosmic | Noir → Bleu nuit → Turquoise → Jaune → Orange → Rouge |
 
-Interpolation continue avec alternance endroit/envers. `colorRepeat` : 40 (escape-time), 2 (Lyapunov).
+Interpolation continue avec alternance endroit/envers. `colorRepeat` : 40 par défaut pour tous les types.
 
 ## Structure principale
 
