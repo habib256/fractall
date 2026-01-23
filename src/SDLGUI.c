@@ -193,7 +193,17 @@ static SDL_Surface* SDLGUI_GenerateButtonImage(SDL_Surface* screen, gui* g, int 
         Fractal_Destroy(f);
       }
       break;
-      
+
+    case 24:
+      {
+        // Nebulabrot utilise son propre algorithme de rendu RGB
+        fractal f;
+        f = Fractal_Init(buttonSize, buttonSize, 24);
+        Nebulabrot_Draw(buttonSurface, &f, 0, 0, NULL);
+        Fractal_Destroy(f);
+      }
+      break;
+
     default:
       {
         // Autres types de fractales escape-time
@@ -270,6 +280,14 @@ void SDLGUI_Button_Draw (SDL_Surface* screen, gui* g, int xplace) {
             fractal f;
             f = Fractal_Init (g->buttonSize-4, g->buttonSize-4, 17);
             Fractal_Draw (screen, f, xplace+2, 4, NULL);
+            Fractal_Destroy (f);
+          }
+          break;
+        case 24:
+          {
+            fractal f;
+            f = Fractal_Init (g->buttonSize-4, g->buttonSize-4, 24);
+            Nebulabrot_Draw (screen, &f, xplace+2, 4, NULL);
             Fractal_Destroy (f);
           }
           break;

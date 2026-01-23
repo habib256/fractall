@@ -2017,6 +2017,9 @@ void Fractal_ChangeType (fractal* f, int type) {
 	case 23:
 	Multibrot_def (f);
 	break;
+	case 24:
+	Nebulabrot_def (f);
+	break;
 	default:
 	Mendelbrot_def (f);
 	}
@@ -2101,10 +2104,11 @@ const char* Fractal_GetTypeName(int type) {
 		"Alpha Mandelbrot",  // 20
 		"Pickover Stalks",   // 21
 		"Nova",              // 22
-		"Multibrot"          // 23
+		"Multibrot",         // 23
+		"Nebulabrot"         // 24
 	};
 
-	if (type >= 0 && type <= 23) {
+	if (type >= 0 && type <= 24) {
 		return typeNames[type];
 	}
 	return "Unknown";
@@ -3645,6 +3649,379 @@ static Uint32 Lyapunov_Draw_Sequence (SDL_Surface *canvas, fractal* f, int decal
 /* Fonction de rendu pour Lyapunov Zircon City (séquence "BBBBBBAAAAAA" - 6B puis 6A) */
 Uint32 Lyapunov_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decalageY, void* guiPtr) {
 	return Lyapunov_Draw_Sequence(canvas, f, decalageX, decalageY, guiPtr, "BBBBBBAAAAAA", "Lyapunov Zircon City");
+}
+
+// *************************************************************************
+// *	Nebulabrot - Méthode RGB avec 3 limites d'itérations
+// *************************************************************************
+
+/* Valeurs par défaut pour Nebulabrot */
+void Nebulabrot_def (fractal* f) {
+	f->xmin = -2.5;
+	f->xmax = 1.5;
+	f->ymin = -1.5;
+	f->ymax = 1.5;
+	f->seed = ZeroSetofComplex();
+	f->bailout = 4;
+	f->iterationMax = 5000;  // Utilisé pour le canal vert (référence)
+	f->zoomfactor = 4;
+}
+
+/* Fonction de rendu Nebulabrot - 3 canaux RGB avec limites d'itérations différentes
+ * Rouge: itérations courtes (500) - structures fines
+ * Vert: itérations moyennes (5000) - structures moyennes
+ * Bleu: itérations longues (50000) - structures profondes
+ */
+Uint32 Nebulabrot_Draw (SDL_Surface *canvas, fractal* f, int decalageX, int decalageY, void* guiPtr) {
+	int i, j;
+	Uint32 time;
+	int xpixel = f->xpixel;
+	int ypixel = f->ypixel;
+	int bailout = f->bailout;
+
+	// Limites d'itérations pour chaque canal RGB
+	const int ITER_R = 50;     // Rouge - structures fines (échappement rapide)
+	const int ITER_G = 500;    // Vert - structures moyennes
+	const int ITER_B = 5000;   // Bleu - structures profondes (échappement lent)
+	const int ITER_MAX = ITER_B;  // Maximum pour le calcul
+
+	// Coordonnées du plan complexe
+	double xmin = f->xmin;
+	double ymin = f->ymin;
+	double xmax = f->xmax;
+	double ymax = f->ymax;
+	double xrange = xmax - xmin;
+	double yrange = ymax - ymin;
+
+	// Vérifications de sécurité
+	if (f == NULL || f->fmatrix == NULL || f->cmatrix == NULL) {
+		fprintf(stderr, "Erreur: structure fractale invalide pour Nebulabrot\n");
+		return 0;
+	}
+
+	if (xrange <= 0.0 || yrange <= 0.0 || xpixel <= 0 || ypixel <= 0) {
+		fprintf(stderr, "Erreur: paramètres invalides pour Nebulabrot\n");
+		return 0;
+	}
+
+	time = SDL_GetTicks();
+	printf("Calculating Nebulabrot (RGB density algorithm)...\n");
+	printf("  Red channel: %d iterations\n", ITER_R);
+	printf("  Green channel: %d iterations\n", ITER_G);
+	printf("  Blue channel: %d iterations\n", ITER_B);
+
+	// Allouer les 3 matrices de densité pour R, G, B
+	int matrixSize = xpixel * ypixel;
+	int *densityR = (int*) calloc(matrixSize, sizeof(int));
+	int *densityG = (int*) calloc(matrixSize, sizeof(int));
+	int *densityB = (int*) calloc(matrixSize, sizeof(int));
+
+	if (densityR == NULL || densityG == NULL || densityB == NULL) {
+		fprintf(stderr, "Erreur allocation mémoire pour Nebulabrot\n");
+		if (densityR) free(densityR);
+		if (densityG) free(densityG);
+		if (densityB) free(densityB);
+		return 0;
+	}
+
+	// Nombre d'échantillons adaptatif
+	int pixels = xpixel * ypixel;
+	int numSamples;
+	if (pixels <= 640*480) {
+		numSamples = pixels * 15;
+	} else if (pixels <= 1024*768) {
+		numSamples = pixels * 8;
+	} else {
+		numSamples = pixels * 4;
+	}
+	if (numSamples < 1000) numSamples = 1000;
+	if (numSamples > 30000000) numSamples = 30000000;
+
+	printf("Nebulabrot: %d samples\n", numSamples);
+
+	if (guiPtr != NULL) {
+		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, 0, "Nebulabrot");
+	}
+
+#ifdef HAVE_OPENMP
+	volatile int cancelled = 0;
+	volatile int sample_counter = 0;
+	int num_threads = omp_get_max_threads();
+	printf("Using OpenMP with %d threads\n", num_threads);
+
+	#pragma omp parallel shared(cancelled, sample_counter, densityR, densityG, densityB)
+	{
+		int thread_id = omp_get_thread_num();
+		unsigned int seed = (unsigned int)(42 + thread_id * 12345);
+
+		// Buffer pour stocker la trajectoire (taille max)
+		double *trajX = (double*) malloc(ITER_MAX * sizeof(double));
+		double *trajY = (double*) malloc(ITER_MAX * sizeof(double));
+
+		if (trajX != NULL && trajY != NULL) {
+			while (!cancelled) {
+				int my_sample;
+				#pragma omp atomic capture
+				my_sample = sample_counter++;
+
+				if (my_sample >= numSamples) break;
+
+				// Thread 0 : vérifier événements et progression
+				if (thread_id == 0 && my_sample % 500 == 0) {
+					if (check_events_and_cancel()) {
+						printf("Calcul Nebulabrot annulé par l'utilisateur\n");
+						cancelled = 1;
+						break;
+					}
+					if (guiPtr != NULL) {
+						int percent = (my_sample * 85) / numSamples;
+						if (percent > 85) percent = 85;
+						SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, "Nebulabrot");
+					}
+				}
+
+				// Générer un point c aléatoire
+				seed = seed * 1103515245 + 12345;
+				double xg = ((double)(seed & 0x7FFFFFFF) / 2147483647.0) * xrange + xmin;
+				seed = seed * 1103515245 + 12345;
+				double yg = ((double)(seed & 0x7FFFFFFF) / 2147483647.0) * yrange + ymin;
+
+				complex c = MakeComplex(xg, yg);
+				complex z = ZeroSetofComplex();
+
+				// Itérer jusqu'à ITER_MAX
+				int escaped = 0;
+				int iter;
+				double mag2_z = 0.0;
+
+				for (iter = 0; iter < ITER_MAX; iter++) {
+					if (iter % 100 == 0 && cancelled) break;
+
+					complex zTemp = Mulz(z, z);
+					z = Addz(zTemp, c);
+
+					double zx = Rez(z);
+					double zy = Imz(z);
+					if (isnan(zx) || isnan(zy) || isinf(zx) || isinf(zy)) break;
+
+					mag2_z = zx * zx + zy * zy;
+					trajX[iter] = zx;
+					trajY[iter] = zy;
+
+					if (mag2_z > bailout * bailout) {
+						escaped = 1;
+						break;
+					}
+				}
+
+				// Si le point s'échappe, accumuler dans les matrices appropriées
+				if (escaped && iter > 0 && !cancelled) {
+					double scale_x = xpixel / xrange;
+					double scale_y = ypixel / yrange;
+
+					// Déterminer quels canaux reçoivent cette trajectoire
+					int contributeR = (iter <= ITER_R);
+					int contributeG = (iter <= ITER_G);
+					int contributeB = (iter <= ITER_B);
+
+					for (int traj_idx = 0; traj_idx < iter; traj_idx++) {
+						if (isnan(trajX[traj_idx]) || isnan(trajY[traj_idx])) continue;
+
+						double px_d = (trajX[traj_idx] - xmin) * scale_x;
+						double py_d = (trajY[traj_idx] - ymin) * scale_y;
+
+						if (px_d < 0.0 || px_d >= (double)xpixel ||
+						    py_d < 0.0 || py_d >= (double)ypixel) continue;
+
+						int px = (int)px_d;
+						int py = (int)py_d;
+
+						if (px >= 0 && px < xpixel && py >= 0 && py < ypixel) {
+							int idx = py * xpixel + px;
+							if (idx >= 0 && idx < matrixSize) {
+								if (contributeR) {
+									#pragma omp atomic
+									densityR[idx]++;
+								}
+								if (contributeG) {
+									#pragma omp atomic
+									densityG[idx]++;
+								}
+								if (contributeB) {
+									#pragma omp atomic
+									densityB[idx]++;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (trajX != NULL) free(trajX);
+		if (trajY != NULL) free(trajY);
+	}
+
+	if (cancelled) {
+		printf("Nebulabrot: calcul interrompu à %d/%d échantillons\n", sample_counter, numSamples);
+	}
+#else
+	// Version séquentielle
+	double *trajX = (double*) malloc(ITER_MAX * sizeof(double));
+	double *trajY = (double*) malloc(ITER_MAX * sizeof(double));
+
+	if (trajX == NULL || trajY == NULL) {
+		fprintf(stderr, "Erreur allocation mémoire trajectoire\n");
+		free(densityR); free(densityG); free(densityB);
+		return 0;
+	}
+
+	srand(42);
+
+	for (int sample = 0; sample < numSamples; sample++) {
+		if (sample % 1000 == 0) {
+			if (check_events_and_cancel()) {
+				printf("Calcul Nebulabrot annulé par l'utilisateur\n");
+				break;
+			}
+			if (guiPtr != NULL) {
+				int percent = (sample * 85) / numSamples;
+				SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, "Nebulabrot");
+			}
+		}
+
+		double xg = ((double)rand() / RAND_MAX) * xrange + xmin;
+		double yg = ((double)rand() / RAND_MAX) * yrange + ymin;
+
+		complex c = MakeComplex(xg, yg);
+		complex z = ZeroSetofComplex();
+
+		int escaped = 0;
+		int iter;
+		double mag2_z = 0.0;
+
+		for (iter = 0; iter < ITER_MAX; iter++) {
+			complex zTemp = Mulz(z, z);
+			z = Addz(zTemp, c);
+
+			double zx = Rez(z);
+			double zy = Imz(z);
+			if (isnan(zx) || isnan(zy) || isinf(zx) || isinf(zy)) break;
+
+			mag2_z = zx * zx + zy * zy;
+			trajX[iter] = zx;
+			trajY[iter] = zy;
+
+			if (mag2_z > bailout * bailout) {
+				escaped = 1;
+				break;
+			}
+		}
+
+		if (escaped && iter > 0) {
+			double scale_x = xpixel / xrange;
+			double scale_y = ypixel / yrange;
+
+			int contributeR = (iter <= ITER_R);
+			int contributeG = (iter <= ITER_G);
+			int contributeB = (iter <= ITER_B);
+
+			for (int traj_idx = 0; traj_idx < iter; traj_idx++) {
+				if (isnan(trajX[traj_idx]) || isnan(trajY[traj_idx])) continue;
+
+				double px_d = (trajX[traj_idx] - xmin) * scale_x;
+				double py_d = (trajY[traj_idx] - ymin) * scale_y;
+
+				if (px_d < 0.0 || px_d >= (double)xpixel ||
+				    py_d < 0.0 || py_d >= (double)ypixel) continue;
+
+				int px = (int)px_d;
+				int py = (int)py_d;
+
+				if (px >= 0 && px < xpixel && py >= 0 && py < ypixel) {
+					int idx = py * xpixel + px;
+					if (idx >= 0 && idx < matrixSize) {
+						if (contributeR) densityR[idx]++;
+						if (contributeG) densityG[idx]++;
+						if (contributeB) densityB[idx]++;
+					}
+				}
+			}
+		}
+	}
+
+	free(trajX);
+	free(trajY);
+#endif
+
+	// Normalisation et rendu final RGB
+	if (guiPtr != NULL) {
+		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, 90, "Nebulabrot");
+	}
+
+	// Trouver les densités maximales pour chaque canal
+	int maxR = 1, maxG = 1, maxB = 1;
+	for (i = 0; i < matrixSize; i++) {
+		if (densityR[i] > maxR) maxR = densityR[i];
+		if (densityG[i] > maxG) maxG = densityG[i];
+		if (densityB[i] > maxB) maxB = densityB[i];
+	}
+
+	printf("Max densities: R=%d, G=%d, B=%d\n", maxR, maxG, maxB);
+
+	// Normalisation logarithmique et rendu
+	double logMaxR = log(1.0 + (double)maxR);
+	double logMaxG = log(1.0 + (double)maxG);
+	double logMaxB = log(1.0 + (double)maxB);
+
+	for (j = 0; j < ypixel; j++) {
+		for (i = 0; i < xpixel; i++) {
+			int idx = j * xpixel + i;
+
+			// Normalisation logarithmique pour chaque canal
+			double normR = (logMaxR > 0) ? log(1.0 + (double)densityR[idx]) / logMaxR : 0;
+			double normG = (logMaxG > 0) ? log(1.0 + (double)densityG[idx]) / logMaxG : 0;
+			double normB = (logMaxB > 0) ? log(1.0 + (double)densityB[idx]) / logMaxB : 0;
+
+			// Clamp [0, 1]
+			if (normR > 1.0) normR = 1.0;
+			if (normG > 1.0) normG = 1.0;
+			if (normB > 1.0) normB = 1.0;
+
+			// Convertir en valeurs 0-255
+			Uint8 r = (Uint8)(normR * 255);
+			Uint8 g = (Uint8)(normG * 255);
+			Uint8 b = (Uint8)(normB * 255);
+
+			// Stocker dans cmatrix pour cohérence
+			f->cmatrix[idx].r = r;
+			f->cmatrix[idx].g = g;
+			f->cmatrix[idx].b = b;
+			f->cmatrix[idx].a = 255;
+
+			pixelRGBA(canvas, (Sint16)(i + decalageX), (Sint16)(j + decalageY), r, g, b, 255);
+		}
+
+		// Mise à jour progressive
+		if (j % 50 == 0 || j == ypixel - 1) {
+			SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
+			if (guiPtr != NULL) {
+				int percent = 90 + (j * 10) / ypixel;
+				SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, "Nebulabrot");
+			}
+		}
+	}
+
+	SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
+
+	// Libérer les matrices temporaires
+	free(densityR);
+	free(densityG);
+	free(densityB);
+
+	time = SDL_GetTicks() - time;
+	printf("Nebulabrot rendered in %d ms (%d samples)\n", time, numSamples);
+	return time;
 }
 
 /* Variantes Lyapunov 18-27 supprimées - seule Zircon City (type 17) est conservée */

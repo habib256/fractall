@@ -32,7 +32,7 @@ fractall [-x<largeur>] [-y<hauteur>] [-f] [-g<hauteur_gui>] [-nogui] [-h]
 | Touche | Effet |
 |--------|-------|
 | **F1-F12** | Von Koch, Dragon, Mandelbrot, Julia, Julia Sin, Newton, Phoenix, Buffalo, Burning Ship, Tricorn, Mandelbulb, Buddhabrot |
-| **GUI** | 23 boutons (types 1-23) pour accéder à toutes les fractales |
+| **GUI** | 24 boutons (types 1-24) pour accéder à toutes les fractales |
 | **Clic gauche** | Zoom / +1 itération (vectorielles) |
 | **Clic gauche + glisser** | Zoom par sélection rectangulaire (escape-time) |
 | **Clic droit** | Dézoom / -1 itération |
@@ -46,7 +46,7 @@ fractall [-x<largeur>] [-y<hauteur>] [-f] [-g<hauteur_gui>] [-nogui] [-h]
 ```
 src/
 ├── main.c              # Point d'entrée, événements, zoom par sélection
-├── EscapeTime.[ch]     # Fractales escape-time (23 types)
+├── EscapeTime.[ch]     # Fractales escape-time (24 types)
 ├── colorization.[ch]   # Colorisation unifiée (9 palettes)
 ├── color_types.h       # Type color unifié
 ├── VonKoch.[ch]        # Fractales vectorielles
@@ -69,7 +69,7 @@ src/
 | 1 | Von Koch | 8 |
 | 2 | Dragon | 20 |
 
-### Escape-time (Types 3-23)
+### Escape-time (Types 3-24)
 
 | Type | Nom | Fonction | Formule | Domaine | Defaults |
 |------|-----|----------|---------|---------|----------|
@@ -94,8 +94,9 @@ src/
 | 21 | Pickover Stalks | `PickoverStalks_Iteration()` | z²+c avec trap min(\|Re\|,\|Im\|) | [-2,1]×[-1.5,1.5] | bailout=100, iter=1000 |
 | 22 | Nova | `Nova_Iteration()` | z_{n+1}=z-a(z³-1)/(3z²)+c | [-3,3]×[-2,2] | bailout=20, iter=500 |
 | 23 | Multibrot | `Multibrot_Iteration()` | z_{n+1}=z^{2.5}+c | [-2.5,1.5]×[-1.5,1.5] | iter=5000 |
+| 24 | Nebulabrot | `Nebulabrot_Draw()` | RGB: 50/500/5000 iter | [-2.5,1.5]×[-1.5,1.5] | R=50, G=500, B=5000 |
 
-**Notes** : Types 9-12, 17-23 accessibles uniquement via GUI. Bailout par défaut = 4.
+**Notes** : Types 9-12, 17-24 accessibles uniquement via GUI. Bailout par défaut = 4.
 
 ## Palettes de couleurs (9)
 
@@ -175,11 +176,12 @@ main() → SDL_Init() → SDLGUI_Init() → Fractal_Init()
 |----------|---------|-------------|
 | `Fractal_Draw()` | EscapeTime.c | Dispatch vers DDp1/DDp2 ou algorithmes spéciaux (16-17) |
 | `Fractal_Init()` | EscapeTime.c | Initialisation avec defaults selon type |
-| `Fractal_GetTypeName()` | EscapeTime.c | Nom du type (0-23) |
+| `Fractal_GetTypeName()` | EscapeTime.c | Nom du type (0-24) |
 | `Buddhabrot_Draw()` | EscapeTime.c | Algorithme densité trajectoires |
 | `Lyapunov_Draw()` | EscapeTime.c | Exposant de Lyapunov |
+| `Nebulabrot_Draw()` | EscapeTime.c | Buddhabrot RGB (3 limites iter) |
 | `GetColorForIteration()` | colorization.c | Colorisation unifiée |
-| `SDLGUI_Init()` | SDLGUI.c | Initialisation GUI 23 boutons |
+| `SDLGUI_Init()` | SDLGUI.c | Initialisation GUI 24 boutons |
 
 ## Notes techniques
 

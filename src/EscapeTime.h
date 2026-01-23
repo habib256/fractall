@@ -155,6 +155,7 @@ void Nova_def (fractal* f);
 void Multibrot_def (fractal* f);
 void Buddhabrot_def (fractal* f);
 void Lyapunov_def (fractal* f);
+void Nebulabrot_def (fractal* f);
 
 // Buddhabrot special draw function (density algorithm)
 // gui parameter can be NULL if no GUI progress display needed
@@ -162,6 +163,10 @@ Uint32 Buddhabrot_Draw (SDL_Surface*, fractal*, int, int, void* gui);
 
 // Lyapunov special draw function (exponent-based coloring)
 Uint32 Lyapunov_Draw (SDL_Surface*, fractal*, int, int, void* gui);
+
+// Nebulabrot special draw function (RGB density with 3 iteration limits)
+// Red: 500 iter, Green: 5000 iter, Blue: 50000 iter
+Uint32 Nebulabrot_Draw (SDL_Surface*, fractal*, int, int, void* gui);
 
 // Utilitaire pour obtenir le nom de la fractale selon son type
 const char* Fractal_GetTypeName(int type);

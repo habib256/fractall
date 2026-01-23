@@ -187,7 +187,7 @@ main (int argc, char *argv[])
 	
 	// On initialise le menu si useGui = TRUE
 	if (useGui)
-		g = SDLGUI_Init (0, 0, win.w, win.y1, stateH, SDL_MapRGB (screen->format, 213, 214, 213), 23);	// 23 boutons (types 1-23)
+		g = SDLGUI_Init (0, 0, win.w, win.y1, stateH, SDL_MapRGB (screen->format, 213, 214, 213), 24);	// 24 boutons (types 1-24)
 	if (useGui) {
 		g.selectedType = typeFractale;  // Initialiser avec le type par défaut
 		SDLGUI_Draw (screen, &g);
@@ -306,6 +306,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				if (*typeFractale >= 3) {
 					if (*typeFractale == 16) {
 						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+					} else if (*typeFractale == 24) {
+						*renderTime = Nebulabrot_Draw (screen, f, 0, win.y1, g);
 					} else if (is_lyapunov_type(*typeFractale)) {
 						// Le type Lyapunov (17) : recalculer seulement la colorisation
 						int dummyProgress = 0;
@@ -363,6 +365,8 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 				if (*typeFractale >= 3) {
 					if (*typeFractale == 16) {
 						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+					} else if (*typeFractale == 24) {
+						*renderTime = Nebulabrot_Draw (screen, f, 0, win.y1, g);
 					} else if (is_lyapunov_type(*typeFractale)) {
 						// Le type Lyapunov (17) : recalculer seulement la colorisation
 						int dummyProgress = 0;
@@ -581,6 +585,15 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					{
 					Fractal_ChangeType (f, *typeFractale);
 					*renderTime = Fractal_Draw (screen, *f, 0, win.y1, g);
+					centerX = (f->xmin + f->xmax) / 2;
+					centerY = (f->ymin + f->ymax) / 2;
+					SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
+					}
+					break;
+					case 24:
+					{
+					Fractal_ChangeType (f, 24);
+					*renderTime = Nebulabrot_Draw (screen, f, 0, win.y1, g);
 					centerX = (f->xmin + f->xmax) / 2;
 					centerY = (f->ymin + f->ymax) / 2;
 					SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
@@ -1192,9 +1205,11 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 					// Réinitialiser cmatrix_valid pour forcer le recalcul après zoom
 					f->cmatrix_valid = 0;
 					
-					// Buddhabrot et Lyapunov utilisent leur propre algorithme de rendu
+					// Buddhabrot, Nebulabrot et Lyapunov utilisent leur propre algorithme de rendu
 					if (*typeFractale == 16) {
 						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+					} else if (*typeFractale == 24) {
+						*renderTime = Nebulabrot_Draw (screen, f, 0, win.y1, g);
 					} else if (is_lyapunov_type(*typeFractale)) {
 						*renderTime = Fractal_Draw (screen, *f, 0, win.y1, g);
 					} else {
@@ -1329,21 +1344,23 @@ int EventCheck (SDL_Event* event, SDL_Surface* screen, gui* g, fractal* f,
 #endif
 					
 					f->cmatrix_valid = 0;
-					
+
 					// Recalculer la fractale
 					if (*typeFractale == 16) {
 						*renderTime = Buddhabrot_Draw (screen, f, 0, win.y1, g);
+					} else if (*typeFractale == 24) {
+						*renderTime = Nebulabrot_Draw (screen, f, 0, win.y1, g);
 					} else if (is_lyapunov_type(*typeFractale)) {
 						*renderTime = Fractal_Draw (screen, *f, 0, win.y1, g);
 					} else {
 						*renderTime = Fractal_Draw (screen, *f, 0, win.y1, g);
 					}
-					
+
 					centerX = (f->xmin + f->xmax) / 2;
 					centerY = (f->ymin + f->ymax) / 2;
 					if (g != NULL)
 						SDLGUI_StateBar_Update(screen, g, *typeFractale, f->colorMode, centerX, centerY, calculate_zoom_factor(f), *renderTime, f);
-					
+
 					printf ("Zoom zone: X=[%f, %f] Y=[%f, %f]\n", newXmin, newXmax, newYmin, newYmax);
 				} else {
 					// Rectangle trop petit ou invalide, restaurer l'image
