@@ -34,8 +34,8 @@ void Fractal_Destroy(fractal f);
 
 // Calcul de la matrice de complexe z lors de leur derniere iteration
 void Fractal_CalculateMatrix(fractal* f);
-void Fractal_CalculateMatrix_DDp1(fractal* f, SDL_Surface* canvas, void* gui, int* progress, int progressStart, int progressEnd, const char* fractalName);
-void Fractal_CalculateMatrix_DDp2(fractal* f, SDL_Surface* canvas, void* gui, int* progress, int progressStart, int progressEnd, const char* fractalName);
+void Fractal_CalculateMatrix_DDp1(fractal* f, SDL_Surface* canvas, void* gui, int* progress, int progressStart, int progressEnd, const char* fractalName, int decalageX, int decalageY);
+void Fractal_CalculateMatrix_DDp2(fractal* f, SDL_Surface* canvas, void* gui, int* progress, int progressStart, int progressEnd, const char* fractalName, int decalageX, int decalageY);
 
 // Calcul de la couleur
 void Fractal_CalculateColorMatrix(fractal* f, SDL_Surface* canvas, void* gui, int* progress, int progressStart, int progressEnd);

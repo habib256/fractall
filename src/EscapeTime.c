@@ -658,7 +658,7 @@ static void Fractal_CalculateMatrix_DDp1_GMP (fractal* f, SDL_Surface* canvas, v
 }
 #endif
 
-void Fractal_CalculateMatrix_DDp1 (fractal* f, SDL_Surface* canvas, void* guiPtr, int* progress, int progressStart, int progressEnd, const char* fractalName) {
+void Fractal_CalculateMatrix_DDp1 (fractal* f, SDL_Surface* canvas, void* guiPtr, int* progress, int progressStart, int progressEnd, const char* fractalName, int decalageX, int decalageY) {
 	// Invalider cmatrix car la matrice d'itérations va changer
 	f->cmatrix_valid = 0;
 
@@ -742,6 +742,45 @@ void Fractal_CalculateMatrix_DDp1 (fractal* f, SDL_Surface* canvas, void* guiPtr
 			*progress = percent;
 			SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
 		}
+
+		// Rendu progressif du chunk
+		if (canvas != NULL && !cancelled) {
+			const gradient_table* gradient = Colorization_GetPalette(f->colorMode);
+			int chunk_end_actual = (chunk_start + chunk_height < ypixel) ? chunk_start + chunk_height : ypixel;
+			double repeatCount = (double)f->colorRepeat;
+			int iterMax = f->iterationMax;
+
+			for (int jj = chunk_start; jj < chunk_end_actual; jj++) {
+				for (int ii = 0; ii < xpixel; ii++) {
+					int idx = xpixel * jj + ii;
+					int iteration = f->fmatrix[idx];
+
+					// Points dans l'ensemble : noir
+					if (iteration >= iterMax) {
+						f->cmatrix[idx].r = 0;
+						f->cmatrix[idx].g = 0;
+						f->cmatrix[idx].b = 0;
+						f->cmatrix[idx].a = 255;
+						pixelRGBA(canvas, ii + decalageX, jj + decalageY, 0, 0, 0, 255);
+						continue;
+					}
+
+					double t = Colorization_SmoothIteration(f, ii, jj);
+					if (t >= 1.0) t = 0.999999;
+					double cycle = floor(t * repeatCount);
+					double t_repeat = fmod(t * repeatCount, 1.0);
+					if ((int)cycle % 2 == 1) t_repeat = 1.0 - t_repeat;
+
+					colorization_color c = Gradient_Interpolate(gradient, t_repeat);
+					f->cmatrix[idx].r = c.r;
+					f->cmatrix[idx].g = c.g;
+					f->cmatrix[idx].b = c.b;
+					f->cmatrix[idx].a = 255;
+					pixelRGBA(canvas, ii + decalageX, jj + decalageY, c.r, c.g, c.b, 255);
+				}
+			}
+			SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
+		}
 	}
 #else
 	for (int chunk_start = 0; chunk_start < ypixel && !cancelled; chunk_start += chunk_height) {
@@ -787,6 +826,45 @@ void Fractal_CalculateMatrix_DDp1 (fractal* f, SDL_Surface* canvas, void* guiPtr
 			*progress = percent;
 			SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
 		}
+
+		// Rendu progressif du chunk (version séquentielle)
+		if (canvas != NULL && !cancelled) {
+			const gradient_table* gradient = Colorization_GetPalette(f->colorMode);
+			int chunk_end_actual = (chunk_start + chunk_height < ypixel) ? chunk_start + chunk_height : ypixel;
+			double repeatCount = (double)f->colorRepeat;
+			int iterMax = f->iterationMax;
+
+			for (int jj = chunk_start; jj < chunk_end_actual; jj++) {
+				for (int ii = 0; ii < xpixel; ii++) {
+					int idx = xpixel * jj + ii;
+					int iteration = f->fmatrix[idx];
+
+					// Points dans l'ensemble : noir
+					if (iteration >= iterMax) {
+						f->cmatrix[idx].r = 0;
+						f->cmatrix[idx].g = 0;
+						f->cmatrix[idx].b = 0;
+						f->cmatrix[idx].a = 255;
+						pixelRGBA(canvas, ii + decalageX, jj + decalageY, 0, 0, 0, 255);
+						continue;
+					}
+
+					double t = Colorization_SmoothIteration(f, ii, jj);
+					if (t >= 1.0) t = 0.999999;
+					double cycle = floor(t * repeatCount);
+					double t_repeat = fmod(t * repeatCount, 1.0);
+					if ((int)cycle % 2 == 1) t_repeat = 1.0 - t_repeat;
+
+					colorization_color c = Gradient_Interpolate(gradient, t_repeat);
+					f->cmatrix[idx].r = c.r;
+					f->cmatrix[idx].g = c.g;
+					f->cmatrix[idx].b = c.b;
+					f->cmatrix[idx].a = 255;
+					pixelRGBA(canvas, ii + decalageX, jj + decalageY, c.r, c.g, c.b, 255);
+				}
+			}
+			SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
+		}
 	}
 #endif
 
@@ -795,6 +873,9 @@ void Fractal_CalculateMatrix_DDp1 (fractal* f, SDL_Surface* canvas, void* guiPtr
 		*progress = progressEnd;
 		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progressEnd, fractalName);
 	}
+
+	// Marquer cmatrix comme valide après le rendu progressif
+	f->cmatrix_valid = 1;
 }
 
 #ifdef HAVE_GMP
@@ -1348,7 +1429,7 @@ static void Fractal_CalculateMatrix_DDp2_GMP (fractal* f, SDL_Surface* canvas, v
 }
 #endif
 
-void Fractal_CalculateMatrix_DDp2 (fractal* f, SDL_Surface* canvas, void* guiPtr, int* progress, int progressStart, int progressEnd, const char* fractalName) {
+void Fractal_CalculateMatrix_DDp2 (fractal* f, SDL_Surface* canvas, void* guiPtr, int* progress, int progressStart, int progressEnd, const char* fractalName, int decalageX, int decalageY) {
 	// Invalider cmatrix car DDp2 modifie aussi fmatrix
 	f->cmatrix_valid = 0;
 
@@ -1549,6 +1630,45 @@ void Fractal_CalculateMatrix_DDp2 (fractal* f, SDL_Surface* canvas, void* guiPtr
 			*progress = percent;
 			SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
 		}
+
+		// Rendu progressif du chunk (DDp2 Pass 2)
+		if (canvas != NULL && !cancelled) {
+			const gradient_table* gradient = Colorization_GetPalette(f->colorMode);
+			int chunk_end_actual = (chunk_start + chunk_height < ypixel) ? chunk_start + chunk_height : ypixel;
+			double repeatCount = (double)f->colorRepeat;
+			int iterMax = f->iterationMax;
+
+			for (int jj = chunk_start; jj < chunk_end_actual; jj++) {
+				for (int ii = 0; ii < xpixel; ii++) {
+					int idx = xpixel * jj + ii;
+					int iteration = f->fmatrix[idx];
+
+					// Points dans l'ensemble : noir
+					if (iteration >= iterMax) {
+						f->cmatrix[idx].r = 0;
+						f->cmatrix[idx].g = 0;
+						f->cmatrix[idx].b = 0;
+						f->cmatrix[idx].a = 255;
+						pixelRGBA(canvas, ii + decalageX, jj + decalageY, 0, 0, 0, 255);
+						continue;
+					}
+
+					double t = Colorization_SmoothIteration(f, ii, jj);
+					if (t >= 1.0) t = 0.999999;
+					double cycle = floor(t * repeatCount);
+					double t_repeat = fmod(t * repeatCount, 1.0);
+					if ((int)cycle % 2 == 1) t_repeat = 1.0 - t_repeat;
+
+					colorization_color c = Gradient_Interpolate(gradient, t_repeat);
+					f->cmatrix[idx].r = c.r;
+					f->cmatrix[idx].g = c.g;
+					f->cmatrix[idx].b = c.b;
+					f->cmatrix[idx].a = 255;
+					pixelRGBA(canvas, ii + decalageX, jj + decalageY, c.r, c.g, c.b, 255);
+				}
+			}
+			SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
+		}
 	}
 #else
 	for (int chunk_start = 0; chunk_start < ypixel && !cancelled; chunk_start += chunk_height) {
@@ -1637,6 +1757,45 @@ void Fractal_CalculateMatrix_DDp2 (fractal* f, SDL_Surface* canvas, void* guiPtr
 			*progress = percent;
 			SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, percent, fractalName);
 		}
+
+		// Rendu progressif du chunk (DDp2 Pass 2 séquentiel)
+		if (canvas != NULL && !cancelled) {
+			const gradient_table* gradient = Colorization_GetPalette(f->colorMode);
+			int chunk_end_actual = (chunk_start + chunk_height < ypixel) ? chunk_start + chunk_height : ypixel;
+			double repeatCount = (double)f->colorRepeat;
+			int iterMax = f->iterationMax;
+
+			for (int jj = chunk_start; jj < chunk_end_actual; jj++) {
+				for (int ii = 0; ii < xpixel; ii++) {
+					int idx = xpixel * jj + ii;
+					int iteration = f->fmatrix[idx];
+
+					// Points dans l'ensemble : noir
+					if (iteration >= iterMax) {
+						f->cmatrix[idx].r = 0;
+						f->cmatrix[idx].g = 0;
+						f->cmatrix[idx].b = 0;
+						f->cmatrix[idx].a = 255;
+						pixelRGBA(canvas, ii + decalageX, jj + decalageY, 0, 0, 0, 255);
+						continue;
+					}
+
+					double t = Colorization_SmoothIteration(f, ii, jj);
+					if (t >= 1.0) t = 0.999999;
+					double cycle = floor(t * repeatCount);
+					double t_repeat = fmod(t * repeatCount, 1.0);
+					if ((int)cycle % 2 == 1) t_repeat = 1.0 - t_repeat;
+
+					colorization_color c = Gradient_Interpolate(gradient, t_repeat);
+					f->cmatrix[idx].r = c.r;
+					f->cmatrix[idx].g = c.g;
+					f->cmatrix[idx].b = c.b;
+					f->cmatrix[idx].a = 255;
+					pixelRGBA(canvas, ii + decalageX, jj + decalageY, c.r, c.g, c.b, 255);
+				}
+			}
+			SDL_UpdateRect(canvas, 0, 0, canvas->w, canvas->h);
+		}
 	}
 #endif
 
@@ -1645,6 +1804,9 @@ void Fractal_CalculateMatrix_DDp2 (fractal* f, SDL_Surface* canvas, void* guiPtr
 		*progress = progressEnd;
 		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progressEnd, fractalName);
 	}
+
+	// Marquer cmatrix comme valide après le rendu progressif
+	f->cmatrix_valid = 1;
 }
 
 
@@ -1732,54 +1894,18 @@ Uint32 Fractal_Draw (SDL_Surface *canvas, fractal myfractal,int decalageX,int de
 		return Lyapunov_Draw(canvas, &myfractal, decalageX, decalageY, guiPtr);
 	}
 
-	int i, j;
-	Uint8 r, g, b;
 	Uint32 time; // Test de temps de calcul en ms
 	int progress = 0;
 	const char* fractalName = Fractal_GetTypeName(myfractal.type);
 
 	time = SDL_GetTicks();
 
-	// DDp1 : 0-25%
-	Fractal_CalculateMatrix_DDp1 (&myfractal, canvas, guiPtr, &progress, 0, 25, fractalName);
-	
-	// Colorisation après DDp1 : 25-37.5%
-	Fractal_CalculateColorMatrix (&myfractal, canvas, guiPtr, &progress, 25, 37);
+	// DDp1 avec rendu progressif : 0-40%
+	Fractal_CalculateMatrix_DDp1(&myfractal, canvas, guiPtr, &progress, 0, 40, fractalName, decalageX, decalageY);
 
-	//Draw Demi-Fractal to the SDL_Buffer and colorize it
-	for (i=0; i<myfractal.xpixel; i++) {
-		for (j=0; j<myfractal.ypixel; j++) {
-			r=Fractal_ReadColorMatrixRed (myfractal,i,j);
-			g=Fractal_ReadColorMatrixGreen (myfractal,i,j);
-			b=Fractal_ReadColorMatrixBlue (myfractal,i,j);
-			pixelRGBA(canvas, (Sint16) (i+decalageX), (Sint16) (j+decalageY),  r, g,  b, 255);
-		}
-	}
-	SDL_UpdateRect (canvas, 0, 0, canvas->w, canvas->h);
-	
-	// Mise à jour progression après affichage DDp1 : 37-37.5%
-	if (guiPtr != NULL) {
-		progress = 37;
-		SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progress, fractalName);
-	}
+	// DDp2 avec rendu progressif : 40-100%
+	Fractal_CalculateMatrix_DDp2(&myfractal, canvas, guiPtr, &progress, 40, 100, fractalName, decalageX, decalageY);
 
-	// DDp2 : 37.5-87.5%
-	Fractal_CalculateMatrix_DDp2 (&myfractal, canvas, guiPtr, &progress, 37, 87, fractalName);
-	
-	// Colorisation après DDp2 : 87.5-100%
-	Fractal_CalculateColorMatrix (&myfractal, canvas, guiPtr, &progress, 87, 100);
-
-	//Draw last Demi-Fractal to the SDL_Buffer and colorize it
-	for (i=0; i<myfractal.xpixel; i++) {
-		for (j=0; j<myfractal.ypixel; j++) {
-			r=Fractal_ReadColorMatrixRed (myfractal,i,j);
-			g=Fractal_ReadColorMatrixGreen (myfractal,i,j);
-			b=Fractal_ReadColorMatrixBlue (myfractal,i,j);
-			pixelRGBA(canvas, (Sint16) (i+decalageX), (Sint16) (j+decalageY),  r,g,  b, 255);
-		}
-	}
-	SDL_UpdateRect (canvas, 0, 0, canvas->w, canvas->h);
-	
 	// Mise à jour progression finale : 100%
 	if (guiPtr != NULL) {
 		progress = 100;

@@ -45,19 +45,24 @@ fractall [-x<largeur>] [-y<hauteur>] [-f] [-g<hauteur_gui>] [-nogui] [-h]
 
 ```
 src/
-├── main.c              # Point d'entrée, événements, zoom par sélection
-├── EscapeTime.[ch]     # Fractales escape-time (24 types)
-├── colorization.[ch]   # Colorisation unifiée (9 palettes)
-├── color_types.h       # Type color unifié
-├── VonKoch.[ch]        # Fractales vectorielles
-├── SDLGUI.[ch]         # Interface graphique
-├── complexmath.[ch]    # Arithmétique complexe (double)
-├── complexmath_gmp.[ch]# Arithmétique GMP
-├── complexmath_simd.c  # SIMD (SSE4.1/AVX)
-├── precision_detector.[ch] # Détection précision GMP
-├── gmp_pool.[ch]       # Pool mémoire GMP
-├── png_save.[ch]       # Export PNG avec métadonnées
-└── SDL_gfx*            # Primitives graphiques
+├── main.c                    # Point d'entrée, événements, zoom par sélection
+├── EscapeTime.[ch]           # API principale, DDp1/DDp2, Fractal_Draw
+├── fractal_types.h           # Types et structures (fractal, fractalresult)
+├── fractal_iterations.[ch]   # Fonctions d'itération (Mandelbrot, Julia, etc.)
+├── fractal_definitions.[ch]  # Définitions par défaut des fractales
+├── fractal_special.[ch]      # Algorithmes spéciaux (Buddhabrot, Lyapunov, Nebulabrot)
+├── fractal_iterations_gmp.[ch] # Itérations haute précision GMP
+├── colorization.[ch]         # Colorisation unifiée (9 palettes)
+├── color_types.h             # Type color unifié
+├── VonKoch.[ch]              # Fractales vectorielles
+├── SDLGUI.[ch]               # Interface graphique
+├── complexmath.[ch]          # Arithmétique complexe (double)
+├── complexmath_gmp.[ch]      # Arithmétique GMP
+├── complexmath_simd.c        # SIMD (SSE4.1/AVX)
+├── precision_detector.[ch]   # Détection précision GMP
+├── gmp_pool.[ch]             # Pool mémoire GMP
+├── png_save.[ch]             # Export PNG avec métadonnées
+└── SDL_gfx*                  # Primitives graphiques
 ```
 
 ## Types de fractales
@@ -140,7 +145,11 @@ typedef struct fractal_struct {
 ## Optimisations
 
 ### Divergence Detection (DDp1/DDp2)
-Rendu en 2 passes : grille 2×2 puis affinage. Évite calcul si 4 voisins identiques.
+Rendu en 2 passes avec **affichage progressif** :
+- **DDp1** (0-40%) : Grille 2×2, calcul et affichage par chunks de 32 lignes
+- **DDp2** (40-100%) : Affinage des pixels manquants, évite calcul si 4 voisins identiques
+
+Chaque chunk est colorisé et affiché immédiatement après calcul, offrant un feedback visuel en temps réel. Les points dans l'ensemble (iteration >= iterMax) sont colorés en noir.
 
 ### OpenMP
 Parallélisation multi-cœurs avec `#pragma omp parallel for`, ordonnancement `guided`. Incréments atomiques pour Buddhabrot.
