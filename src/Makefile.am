@@ -21,6 +21,10 @@ fractall_SOURCES = \
 	colorization.h \
 	EscapeTime.c \
 	EscapeTime.h \
+	fractal_types.h \
+	fractal_iterations.h \
+	fractal_definitions.h \
+	fractal_special.h \
 	exception.c \
 	exception.h \
 	SDL_gfxPrimitives.c \
@@ -36,6 +40,11 @@ fractall_SOURCES = \
 	VonKoch.h \
 	png_save.c \
 	png_save.h
+
+# Nouveaux modules (headers seulement pour l'instant, implementation dans EscapeTime.c)
+# Pour migrer completement, decommenter les lignes suivantes et retirer
+# les implementations correspondantes de EscapeTime.c:
+# fractall_SOURCES += fractal_iterations.c fractal_definitions.c
 
 if HAVE_SSE4_1
 fractall_SOURCES += complexmath_simd.c
@@ -57,7 +66,10 @@ fractall_SOURCES += \
 	precision_detector.c \
 	precision_detector.h \
 	gmp_pool.c \
-	gmp_pool.h
+	gmp_pool.h \
+	fractal_iterations_gmp.h
+# Pour migrer completement les fonctions GMP, decommenter:
+# fractall_SOURCES += fractal_iterations_gmp.c
 endif
 
 fractall_LDFLAGS =  -lm

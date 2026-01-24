@@ -89,6 +89,11 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = fractall$(EXEEXT)
+
+# Nouveaux modules (headers seulement pour l'instant, implementation dans EscapeTime.c)
+# Pour migrer completement, decommenter les lignes suivantes et retirer
+# les implementations correspondantes de EscapeTime.c:
+# fractall_SOURCES += fractal_iterations.c fractal_definitions.c
 @HAVE_SSE4_1_TRUE@am__append_1 = complexmath_simd.c
 @HAVE_SSE4_1_TRUE@am__append_2 = -msse4.1
 @HAVE_AVX_TRUE@am__append_3 = -mavx
@@ -99,7 +104,8 @@ bin_PROGRAMS = fractall$(EXEEXT)
 @HAVE_GMP_TRUE@	precision_detector.c \
 @HAVE_GMP_TRUE@	precision_detector.h \
 @HAVE_GMP_TRUE@	gmp_pool.c \
-@HAVE_GMP_TRUE@	gmp_pool.h
+@HAVE_GMP_TRUE@	gmp_pool.h \
+@HAVE_GMP_TRUE@	fractal_iterations_gmp.h
 
 @HAVE_OPENMP_TRUE@am__append_6 = $(OPENMP_CFLAGS)
 @HAVE_OPENMP_TRUE@am__append_7 = $(OPENMP_CFLAGS)
@@ -119,13 +125,15 @@ am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am__fractall_SOURCES_DIST = main.c complexmath.c complexmath.h \
 	color_types.h colorization.c colorization.h EscapeTime.c \
-	EscapeTime.h exception.c exception.h SDL_gfxPrimitives.c \
-	SDL_gfxPrimitives.h SDL_gfxPrimitives_font.h SDLGUI.c SDLGUI.h \
-	SDL_imageFilter.c SDL_imageFilter.h SDL_rotozoom.c \
-	SDL_rotozoom.h VonKoch.c VonKoch.h png_save.c png_save.h \
-	complexmath_simd.c complexmath_gmp.c complexmath_gmp.h \
-	precision_detector.c precision_detector.h gmp_pool.c \
-	gmp_pool.h
+	EscapeTime.h fractal_types.h fractal_iterations.h \
+	fractal_definitions.h fractal_special.h exception.c \
+	exception.h SDL_gfxPrimitives.c SDL_gfxPrimitives.h \
+	SDL_gfxPrimitives_font.h SDLGUI.c SDLGUI.h SDL_imageFilter.c \
+	SDL_imageFilter.h SDL_rotozoom.c SDL_rotozoom.h VonKoch.c \
+	VonKoch.h png_save.c png_save.h complexmath_simd.c \
+	complexmath_gmp.c complexmath_gmp.h precision_detector.c \
+	precision_detector.h gmp_pool.c gmp_pool.h \
+	fractal_iterations_gmp.h
 @HAVE_SSE4_1_TRUE@am__objects_1 = complexmath_simd.$(OBJEXT)
 @HAVE_GMP_TRUE@am__objects_2 = complexmath_gmp.$(OBJEXT) \
 @HAVE_GMP_TRUE@	precision_detector.$(OBJEXT) gmp_pool.$(OBJEXT)
@@ -350,11 +358,14 @@ AM_CFLAGS = -g $(am__append_2) $(am__append_3) $(am__append_4) \
 	$(am__append_6)
 fractall_SOURCES = main.c complexmath.c complexmath.h color_types.h \
 	colorization.c colorization.h EscapeTime.c EscapeTime.h \
-	exception.c exception.h SDL_gfxPrimitives.c \
+	fractal_types.h fractal_iterations.h fractal_definitions.h \
+	fractal_special.h exception.c exception.h SDL_gfxPrimitives.c \
 	SDL_gfxPrimitives.h SDL_gfxPrimitives_font.h SDLGUI.c SDLGUI.h \
 	SDL_imageFilter.c SDL_imageFilter.h SDL_rotozoom.c \
 	SDL_rotozoom.h VonKoch.c VonKoch.h png_save.c png_save.h \
 	$(am__append_1) $(am__append_5)
+# Pour migrer completement les fonctions GMP, decommenter:
+# fractall_SOURCES += fractal_iterations_gmp.c
 fractall_LDFLAGS = -lm $(am__append_7) $(am__append_8)
 fractall_LDADD = \
 	$(IlmBase_LIBS) \
