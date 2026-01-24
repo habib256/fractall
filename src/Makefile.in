@@ -89,11 +89,6 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = fractall$(EXEEXT)
-
-# Nouveaux modules (headers seulement pour l'instant, implementation dans EscapeTime.c)
-# Pour migrer completement, decommenter les lignes suivantes et retirer
-# les implementations correspondantes de EscapeTime.c:
-# fractall_SOURCES += fractal_iterations.c fractal_definitions.c
 @HAVE_SSE4_1_TRUE@am__append_1 = complexmath_simd.c
 @HAVE_SSE4_1_TRUE@am__append_2 = -msse4.1
 @HAVE_AVX_TRUE@am__append_3 = -mavx
@@ -105,7 +100,8 @@ bin_PROGRAMS = fractall$(EXEEXT)
 @HAVE_GMP_TRUE@	precision_detector.h \
 @HAVE_GMP_TRUE@	gmp_pool.c \
 @HAVE_GMP_TRUE@	gmp_pool.h \
-@HAVE_GMP_TRUE@	fractal_iterations_gmp.h
+@HAVE_GMP_TRUE@	fractal_iterations_gmp.h \
+@HAVE_GMP_TRUE@	fractal_iterations_gmp.c
 
 @HAVE_OPENMP_TRUE@am__append_6 = $(OPENMP_CFLAGS)
 @HAVE_OPENMP_TRUE@am__append_7 = $(OPENMP_CFLAGS)
@@ -130,19 +126,22 @@ am__fractall_SOURCES_DIST = main.c complexmath.c complexmath.h \
 	exception.h SDL_gfxPrimitives.c SDL_gfxPrimitives.h \
 	SDL_gfxPrimitives_font.h SDLGUI.c SDLGUI.h SDL_imageFilter.c \
 	SDL_imageFilter.h SDL_rotozoom.c SDL_rotozoom.h VonKoch.c \
-	VonKoch.h png_save.c png_save.h complexmath_simd.c \
+	VonKoch.h png_save.c png_save.h fractal_iterations.c \
+	fractal_definitions.c fractal_special.c complexmath_simd.c \
 	complexmath_gmp.c complexmath_gmp.h precision_detector.c \
 	precision_detector.h gmp_pool.c gmp_pool.h \
-	fractal_iterations_gmp.h
+	fractal_iterations_gmp.h fractal_iterations_gmp.c
 @HAVE_SSE4_1_TRUE@am__objects_1 = complexmath_simd.$(OBJEXT)
 @HAVE_GMP_TRUE@am__objects_2 = complexmath_gmp.$(OBJEXT) \
-@HAVE_GMP_TRUE@	precision_detector.$(OBJEXT) gmp_pool.$(OBJEXT)
+@HAVE_GMP_TRUE@	precision_detector.$(OBJEXT) gmp_pool.$(OBJEXT) \
+@HAVE_GMP_TRUE@	fractal_iterations_gmp.$(OBJEXT)
 am_fractall_OBJECTS = main.$(OBJEXT) complexmath.$(OBJEXT) \
 	colorization.$(OBJEXT) EscapeTime.$(OBJEXT) \
 	exception.$(OBJEXT) SDL_gfxPrimitives.$(OBJEXT) \
 	SDLGUI.$(OBJEXT) SDL_imageFilter.$(OBJEXT) \
 	SDL_rotozoom.$(OBJEXT) VonKoch.$(OBJEXT) png_save.$(OBJEXT) \
-	$(am__objects_1) $(am__objects_2)
+	fractal_iterations.$(OBJEXT) fractal_definitions.$(OBJEXT) \
+	fractal_special.$(OBJEXT) $(am__objects_1) $(am__objects_2)
 fractall_OBJECTS = $(am_fractall_OBJECTS)
 fractall_DEPENDENCIES =
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -173,8 +172,12 @@ am__depfiles_remade = ./$(DEPDIR)/EscapeTime.Po ./$(DEPDIR)/SDLGUI.Po \
 	./$(DEPDIR)/VonKoch.Po ./$(DEPDIR)/colorization.Po \
 	./$(DEPDIR)/complexmath.Po ./$(DEPDIR)/complexmath_gmp.Po \
 	./$(DEPDIR)/complexmath_simd.Po ./$(DEPDIR)/exception.Po \
-	./$(DEPDIR)/gmp_pool.Po ./$(DEPDIR)/main.Po \
-	./$(DEPDIR)/png_save.Po ./$(DEPDIR)/precision_detector.Po
+	./$(DEPDIR)/fractal_definitions.Po \
+	./$(DEPDIR)/fractal_iterations.Po \
+	./$(DEPDIR)/fractal_iterations_gmp.Po \
+	./$(DEPDIR)/fractal_special.Po ./$(DEPDIR)/gmp_pool.Po \
+	./$(DEPDIR)/main.Po ./$(DEPDIR)/png_save.Po \
+	./$(DEPDIR)/precision_detector.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -356,6 +359,8 @@ AM_CPPFLAGS = \
 
 AM_CFLAGS = -g $(am__append_2) $(am__append_3) $(am__append_4) \
 	$(am__append_6)
+
+# Modules modulaires extraits de EscapeTime.c
 fractall_SOURCES = main.c complexmath.c complexmath.h color_types.h \
 	colorization.c colorization.h EscapeTime.c EscapeTime.h \
 	fractal_types.h fractal_iterations.h fractal_definitions.h \
@@ -363,9 +368,8 @@ fractall_SOURCES = main.c complexmath.c complexmath.h color_types.h \
 	SDL_gfxPrimitives.h SDL_gfxPrimitives_font.h SDLGUI.c SDLGUI.h \
 	SDL_imageFilter.c SDL_imageFilter.h SDL_rotozoom.c \
 	SDL_rotozoom.h VonKoch.c VonKoch.h png_save.c png_save.h \
+	fractal_iterations.c fractal_definitions.c fractal_special.c \
 	$(am__append_1) $(am__append_5)
-# Pour migrer completement les fonctions GMP, decommenter:
-# fractall_SOURCES += fractal_iterations_gmp.c
 fractall_LDFLAGS = -lm $(am__append_7) $(am__append_8)
 fractall_LDADD = \
 	$(IlmBase_LIBS) \
@@ -475,6 +479,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/complexmath_gmp.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/complexmath_simd.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exception.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fractal_definitions.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fractal_iterations.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fractal_iterations_gmp.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fractal_special.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gmp_pool.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/png_save.Po@am__quote@ # am--include-marker
@@ -650,6 +658,10 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/complexmath_gmp.Po
 	-rm -f ./$(DEPDIR)/complexmath_simd.Po
 	-rm -f ./$(DEPDIR)/exception.Po
+	-rm -f ./$(DEPDIR)/fractal_definitions.Po
+	-rm -f ./$(DEPDIR)/fractal_iterations.Po
+	-rm -f ./$(DEPDIR)/fractal_iterations_gmp.Po
+	-rm -f ./$(DEPDIR)/fractal_special.Po
 	-rm -f ./$(DEPDIR)/gmp_pool.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/png_save.Po
@@ -710,6 +722,10 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/complexmath_gmp.Po
 	-rm -f ./$(DEPDIR)/complexmath_simd.Po
 	-rm -f ./$(DEPDIR)/exception.Po
+	-rm -f ./$(DEPDIR)/fractal_definitions.Po
+	-rm -f ./$(DEPDIR)/fractal_iterations.Po
+	-rm -f ./$(DEPDIR)/fractal_iterations_gmp.Po
+	-rm -f ./$(DEPDIR)/fractal_special.Po
 	-rm -f ./$(DEPDIR)/gmp_pool.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/png_save.Po

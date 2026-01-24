@@ -335,3 +335,110 @@ void Fractal_ApplyGradient(fractal* f, const gradient_table* g) {
     } /* End of parallel region */
 #endif
 }
+
+/* HSV to RGB conversion */
+colorization_color HSVtoRGB(double h, double s, double v) {
+    colorization_color c;
+    double r, g, b;
+    int i;
+    double f, p, q, t;
+
+    if (s == 0) {
+        r = g = b = v;
+    } else {
+        h = fmod(h, 360.0);
+        if (h < 0) h += 360.0;
+        h /= 60.0;
+        i = (int)floor(h);
+        f = h - i;
+        p = v * (1 - s);
+        q = v * (1 - s * f);
+        t = v * (1 - s * (1 - f));
+
+        switch (i) {
+            case 0: r = v; g = t; b = p; break;
+            case 1: r = q; g = v; b = p; break;
+            case 2: r = p; g = v; b = t; break;
+            case 3: r = p; g = q; b = v; break;
+            case 4: r = t; g = p; b = v; break;
+            default: r = v; g = p; b = q; break;
+        }
+    }
+
+    c.r = (int)(r * 255);
+    c.g = (int)(g * 255);
+    c.b = (int)(b * 255);
+    c.a = 255;
+    return c;
+}
+
+/* Test color mode (debug) */
+void FractalColorTest(fractal* f) {
+    int i, j;
+    int iteration, greyvalue;
+    color c;
+
+    for (j = 0; j < f->ypixel; j++) {
+        for (i = 0; i < f->xpixel; i++) {
+            iteration = *((f->fmatrix)+((f->xpixel*j)+i));
+            greyvalue = 255 - (iteration*255)/f->iterationMax;
+            c.g = (int) fmod (greyvalue/(Rez (*((f->zmatrix)+((f->xpixel*j)+i)))), 255);
+            c.r = (int) fmod (greyvalue, 255);
+            c.b = (int) fmod (greyvalue/(Imz (*((f->zmatrix)+((f->xpixel*j)+i)))), 255);
+            *((f->cmatrix)+((f->xpixel*j)+i)) = c;
+        }
+    }
+}
+
+/* Calculate color matrix for a fractal */
+void Fractal_CalculateColorMatrix(fractal* f, SDL_Surface* canvas, void* guiPtr, int* progress, int progressStart, int progressEnd) {
+    const char* fractalName = Fractal_GetTypeName(f->type);
+    const gradient_table* gradient;
+
+    /* Reuse cmatrix if already valid for current colorMode and colorRepeat */
+    if (f->cmatrix_valid && f->last_colorMode == f->colorMode && f->last_colorRepeat == f->colorRepeat) {
+        if (guiPtr != NULL && progress != NULL) {
+            *progress = progressEnd;
+            SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progressEnd, fractalName);
+        }
+        return;
+    }
+
+    /* Use the unified colorization system */
+    gradient = Colorization_GetPalette(f->colorMode);
+    Fractal_ApplyGradient(f, gradient);
+
+    /* Mark cmatrix as valid */
+    f->cmatrix_valid = 1;
+    f->last_colorMode = f->colorMode;
+    f->last_colorRepeat = f->colorRepeat;
+
+    /* Update progress after colorization */
+    if (guiPtr != NULL && progress != NULL) {
+        SDLGUI_StateBar_Progress(canvas, (gui*)guiPtr, progressEnd, fractalName);
+        *progress = progressEnd;
+    }
+}
+
+/* Read color matrix values */
+colorization_color Fractal_ReadColorMatrix(fractal f, int i, int j) {
+    colorization_color c;
+    color fc = *((f.cmatrix)+((f.xpixel*j)+i));
+    c.r = fc.r;
+    c.g = fc.g;
+    c.b = fc.b;
+    c.a = fc.a;
+    return c;
+}
+
+int Fractal_ReadColorMatrixRed(fractal f, int i, int j) {
+    return (*((f.cmatrix)+((f.xpixel*j)+i))).r;
+}
+
+int Fractal_ReadColorMatrixGreen(fractal f, int i, int j) {
+    return (*((f.cmatrix)+((f.xpixel*j)+i))).g;
+}
+
+int Fractal_ReadColorMatrixBlue(fractal f, int i, int j) {
+    return (*((f.cmatrix)+((f.xpixel*j)+i))).b;
+}

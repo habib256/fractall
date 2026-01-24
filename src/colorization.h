@@ -68,4 +68,19 @@ void Fractal_ApplyGradient(fractal* f, const gradient_table* g);
 /* Calculate smooth iteration value for a pixel */
 double Colorization_SmoothIteration(fractal* f, int i, int j);
 
+/* HSV to RGB conversion */
+colorization_color HSVtoRGB(double h, double s, double v);
+
+/* Calculate color matrix for a fractal */
+void Fractal_CalculateColorMatrix(fractal* f, SDL_Surface* canvas, void* gui, int* progress, int progressStart, int progressEnd);
+
+/* Test color mode (debug) */
+void FractalColorTest(fractal* f);
+
+/* Read color matrix values */
+colorization_color Fractal_ReadColorMatrix(fractal f, int i, int j);
+int Fractal_ReadColorMatrixRed(fractal f, int i, int j);
+int Fractal_ReadColorMatrixGreen(fractal f, int i, int j);
+int Fractal_ReadColorMatrixBlue(fractal f, int i, int j);
+
 #endif /* COLORIZATION_H */
